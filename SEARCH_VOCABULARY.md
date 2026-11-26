@@ -28,7 +28,7 @@ These terms describe possible search tasks. Use them when records provide a mean
 
 ## Search facts by task
 
-Shared fields such as wavelength and clear aperture can be used across tasks. Each task below adds fields when the design and source support them. Keep quantities with their configuration, units, conditions and evidence.
+Shared fields such as wavelength and clear aperture can be used across tasks. Index the values of the committed Project, including analyses of that Project, with their configuration, units and relevant conditions. A source's printed values and transcription comparisons belong to intake. Classification may use the contributor's direct-source description.
 
 | Agent task | Useful search facts |
 | --- | --- |
@@ -44,7 +44,7 @@ A label helps find a candidate. A hard numerical filter requires a comparable va
 ## LensLibrary mapping examples
 
 - `camera_cooke` and `camera_tessar` map to the imaging function and camera-lens type. The source supplies an architecture hint. Use family IDs for documented relationships between specific designs or variants.
-- `microscope_objective` maps to imaging, microscope objective and microscopy. The source property list gives an object-space section with NA and full field in millimeters. Carry those meanings into the record.
+- `microscope_objective` maps to imaging, microscope objective and microscopy. Keep object-side NA and object-space field in millimeters as distinct Project facts when established.
 - `projection_lens_zoom` maps to imaging, projection lens and zoom. Add the projection-display application if the source establishes it. A complete projector that also contains its illuminator can carry both imaging and illumination.
 - `spectrometer_CZT` maps to spectral dispersion and spectrometer. Preserve the source's Czerny–Turner designation for finer retrieval when that term is enabled.
 

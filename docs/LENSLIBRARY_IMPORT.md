@@ -2,7 +2,8 @@
 
 This note records how the first collection was prepared, so a reviewer can repeat it and check
 every claim. It covers the source inventory, the conversion method, the material and surface
-decisions, the verification actually run, and what remains open.
+decisions, the verification actually run, and what remains open. The intake checks are historical.
+See the [record contract](RECORD_FORMAT.md#what-retrieval-uses) for which values retrieval uses.
 
 - **Source:** [Nathan Hagen's LensLibrary](https://github.com/nzhagen/LensLibrary) at revision
   [`86b2c0cac5a67e2112d58518230c4d8728154f4e`](https://github.com/nzhagen/LensLibrary/tree/86b2c0cac5a67e2112d58518230c4d8728154f4e)

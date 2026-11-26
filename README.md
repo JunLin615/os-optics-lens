@@ -4,9 +4,9 @@ A planned library of optical prescriptions for AI agents. An agent uses an optic
 
 ## Project rules
 
-- Design the library, index, retriever and documentation for agents with limited context. Return compact candidate summaries and load details on demand.
-- Keep the corpus to native `os-optics` Projects and the metadata needed to search and cite them. Link to original sources. Keep PDFs, exchange files, images and 3D assets outside the corpus.
-- Keep a specification match and a promising optimization starting point distinguishable in search results. The agent chooses which candidate to use and verifies it against its brief.
+- Search the available native Projects using their own optical values. Return short candidate summaries with the facts that help an agent choose and open a Project.
+- Keep the corpus focused on Projects, compact search metadata and any small supporting data needed to interpret a Project fact. Keep preparation material in the contribution workspace or PR. Record the contributor's direct source and attribution, available through explicit provenance inspection.
+- Keep a specification match and a promising optimization starting point distinguishable in search results. Show a missing value when it matters to the query.
 
 `os-optics` owns the native model and optical evaluation. `os-optics-lens` will own the prescription collection and its installed retrieval interface. `os-optics-kit` provides agent skills, study tools and worked cases. [Engine](https://github.com/JunLin615/os-optics) · [Kit](https://github.com/JunLin615/os-optics-kit)
 
@@ -50,10 +50,9 @@ method, the material and surface decisions, the verification run and the known l
 | `mid_wave_infrared` | 3000 – 8000 |
 | `long_wave_infrared` | 8000 – 15000 |
 
-A facet is a **discovery** label derived from the record's sampling span. It never asserts that the
-design is usable across the interval: a record's `spectrum.continuous_coverage_nm` is `UNCONFIRMED`
-unless the source states a range, so only established continuous coverage can satisfy a hard band
-constraint.
+A facet is a **discovery** label derived from the record's sampling span. A hard band constraint
+uses confirmed continuous coverage of the Project. The state is `UNCONFIRMED` when the record
+supplies only discrete samples or a sampling span.
 
 ## Search the collection
 
@@ -107,7 +106,7 @@ The project uses the [MIT License](LICENSE).
 
 ## Data sources and acknowledgments
 
-The initial prescription records are derived from Nathan Hagen's [LensLibrary](https://github.com/nzhagen/LensLibrary), using [revision `86b2c0ca`](https://github.com/nzhagen/LensLibrary/tree/86b2c0cac5a67e2112d58518230c4d8728154f4e). Thanks to Nathan Hagen for compiling and sharing the collection. See the [LensLibrary MIT notice](licenses/LensLibrary-MIT.txt) for the upstream copyright and license. Individual records cite the upstream design and its original publication or patent when available.
+The initial prescription records are derived from Nathan Hagen's [LensLibrary](https://github.com/nzhagen/LensLibrary), using [revision `86b2c0ca`](https://github.com/nzhagen/LensLibrary/tree/86b2c0cac5a67e2112d58518230c4d8728154f4e). Thanks to Nathan Hagen for compiling and sharing the collection. See the [LensLibrary MIT notice](licenses/LensLibrary-MIT.txt) for the upstream copyright and license. The records identify the library inputs used for conversion.
 
 The LensLibrary notice must stay with the converted records in any distribution. The repository's
 own [MIT License](LICENSE) covers its code and documentation.

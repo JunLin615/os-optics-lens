@@ -1,10 +1,11 @@
 # Camera search evidence
 
-This proposal adds optional, condition-specific facts to camera lens records. The
+This note describes condition-specific facts for camera lens Projects. The preserved
 [Yutong Cup problem 2 acceptance case](../acceptance/yutong-2025-mirrorless-problem-2.json)
-specifies the queries and expected outcomes. Its record is the
-[P2b finite-film camera model](../records/yutong-cup/yutong-2025-mirrorless-18-p2b/record.json).
-Apply the constraints together within one nominal configuration.
+exercises the frozen [P2b record](../records/yutong-cup/yutong-2025-mirrorless-18-p2b/record.json)
+from the first camera intake. Production retrieval uses [Project facts](RECORD_FORMAT.md#what-retrieval-uses)
+under a single applicable configuration. A competition target or published specification remains
+intake context until the committed Project supports the corresponding fact.
 
 | Fact | Comparable conditions |
 | --- | --- |
@@ -44,10 +45,12 @@ An isolated point or a sparser sweep leaves the interval unconfirmed.
   whether the study exists. Problem 2 requires both studies and sets no
   numerical gate for either. The P2b native ghost trace is partial and the
   two complementary screens cover their stated modeled paths.
-- Each camera record links to a compact, reviewable `evidence.json` extract.
+- The two existing camera records link to compact `evidence.json` extracts.
   A fact's `source` identifies the repository-relative file `path`, its SHA-256
-  over committed bytes and the entry under `sections`. The extracts carry the
-  original member or file locators and their hashes.
+  over committed bytes and the entry under `sections`. For retrieval, use the
+  results that apply to the Project. Return only the needed conditions and
+  outcomes by default. Expanded evidence and source locators are available
+  through explicit inspection.
 - The [P2b extract](../records/yutong-cup/yutong-2025-mirrorless-18-p2b/evidence.json)
   provides the sampled field and radiometry table and the modeled tolerance
   and ghost summaries. The [Sonnar extract](../records/opensci-design-studies/portrait-85-sonnar-eight/evidence.json)

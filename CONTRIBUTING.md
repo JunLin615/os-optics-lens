@@ -12,15 +12,15 @@ During repository setup, contributors can open a draft data pull request to revi
 
 ## Prepare a prescription
 
-- Supply the editable native `os-optics` Project with the material and configuration information it needs. Record the engine version used to check it.
-- Supply the search facts relevant to the design, with units, conditions and their source or calculation basis. Use the [optical search vocabulary](SEARCH_VOCABULARY.md) to assign supported labels and propose new terms with a source record or a concrete search task. Record any substitutions or assumptions that affect the interpretation. Mark unknown values and state what was actually checked.
-- Give a precise source reference and identify the design within it. Include the attribution and applicable license or other redistribution permission. For an original design, identify its contributor and confirm the terms for publishing it. Keep source files upstream and link to them.
-- Report the checks you ran, starting with opening the Project in `os-optics`. Record relevant comparisons if you ran optical validation. If conversion fails, attach the failure details to the intake issue so the blocker is visible without adding an incomplete prescription to the corpus.
+- Supply the editable native `os-optics` Project with the material and configuration information it needs. Open it with the stated engine version, check the applicable geometry and confirm that each submitted search value describes that Project and configuration.
+- Supply compact search facts useful for choosing or using the Project. Include units, conditions and calculation basis where relevant. Use the [optical search vocabulary](SEARCH_VOCABULARY.md) for classification. Describe model assumptions where they affect a searchable value or how to use the Project.
+- Name the direct source used for the submission. For a library conversion give the library and input identifier, plus the revision when available. For a direct transcription give the publication and example. For an original design name the contributor. Include applicable attribution and the basis for redistribution.
+- Report intake checks and decisions in the PR or series issue. Use comparable source values as transcription checks when useful. Resolve any issue they reveal with the Project or its metadata. A source comparison is optional intake evidence. The Project's own checks and the support for its advertised values determine its retrieval claims.
 
 ## Prepare a collection or batch
 
 - Propose a collection identity, identify its maintainers and pin the source revision or edition where possible. Describe how source record IDs map to contributed records and how future updates can be tracked.
-- Record the input count, successful conversions and pending or failed conversions, with reasons. Keep material substitutions and optical validation distinct from conversion status. Split large submissions into independently checkable batches.
-- Review existing records for duplicates. Identify related designs and retain distinct variants when their optical parameters or structure make them useful. Let the shared index be generated from the individual records.
+- In the PR or series issue, report the input count, submitted records, deferrals and failures with reasons. Keep the preparation inputs and scripts available to the next contributor outside the distributed corpus. Split large submissions into independently checkable batches.
+- Review existing records for duplicates. Keep the positions of one design in the same Project when native configurations can represent them. Retain distinct prescriptions where their optical parameters or structure make them useful, and group related designs by family. Generate the shared index from the individual records.
 
 Project code and documentation use the [MIT License](LICENSE). Imported records retain their applicable attribution and license or permission. Reviewers check that the submitted files fit the corpus boundary, the source and redistribution basis are recorded, and the evidence supports each claimed result.

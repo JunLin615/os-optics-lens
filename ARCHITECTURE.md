@@ -4,10 +4,10 @@ An agent searches by optical requirements, inspects a small set of candidates, t
 
 ## Records and index
 
-- Keep one native Project per design record, with compact metadata for search and provenance. A Project can contain multiple configurations. Keep the material references and surface models needed to interpret it.
-- Give the record a stable ID, a traceable revision and a design family where known. Retain the source reference, attribution and redistribution basis. Record whether a value came from the source, a derivation or an engine calculation, with its conditions and validation state.
+- Keep one native Project per design record and compact metadata that helps a caller choose or use it. Give each record a stable ID, revision and design family where known. Preserve the native Project's configurations, materials and surface models.
+- Build the search projection from an explicit set of Project facts. Use native values, calculations from the committed Project and analyses applicable to that revision. Index them against their configuration with the relevant units and conditions. A query with several hard constraints must find them together in the same configuration.
+- Keep the contributor's direct-source reference, attribution and redistribution basis available through explicit provenance inspection. Source optical values, source comparisons and intake reports stay outside the search projection. Existing records may carry those fields as review data.
 - Generate the search index from independently editable records. Bundle the index, collection and retriever in the first usable PyPI release for local queries after installation. An embedded SQLite index is the initial storage option for facets, ranges and sorting. Keep the source records independent of the index backend.
-- Index configuration-specific values against the configuration that produced them. A query with several hard constraints must find them together in the same configuration. Keep detailed performance samples accessible on demand.
 
 ## Classification and search fields
 
@@ -18,8 +18,8 @@ Assign a controlled term when a source statement, native Project property or doc
 | Area | Search fields and interpretation |
 | --- | --- |
 | Design scope | Complete system, lens group or singlet. This lets a system search and a component search use the same collection. |
-| Spectral band | Facets for visible, near-infrared, ultraviolet, extreme ultraviolet, mid-wave infrared and long-wave infrared, using documented band definitions. Store the design wavelength range and any sampling wavelengths separately. Filter on the numeric interval when the brief requires specific coverage. |
-| Image format | Full frame and APS-C are discovery facets. Store the image-circle diameter and the image or sensor dimensions when known. Use actual dimensions for coverage checks because APS-C sizes vary. A 36 × 24 mm frame requires about a 43.3 mm image circle for geometric coverage. Use field-dependent results to assess edge image quality. |
+| Spectral band | Use sampling wavelengths to derive discovery facets. Store confirmed continuous coverage of the Project separately and use it for hard band constraints. |
+| Image format | Full frame and APS-C are discovery facets. Use the Project's established image circle or image dimensions for coverage checks. Label an estimated image circle as a discovery fact. A 36 × 24 mm frame requires about a 43.3 mm image circle for geometric coverage. Use field-dependent results to assess edge image quality. |
 | Optical function | The task performed, such as imaging, illumination, collimation or spectral dispersion. |
 | Design type | The kind of prescription, such as a microscope objective, projection lens, condenser or spectrometer. |
 | Application | A documented use, such as microscopy, machine vision, endoscopy or projection display. |
@@ -28,11 +28,11 @@ Assign a controlled term when a source statement, native Project property or doc
 | MTF | Record spatial frequency and units, field position, wavelength or spectral weighting, and sagittal or tangential direction where applicable. Compare values under matching conditions. For a field-interval minimum, record the field coordinate, bounds, sampled positions and included orientations. |
 | Chief ray angle and distortion | For CRA, record the image-plane field position and angle convention. For distortion, record the field position, the reference projection and the sign or absolute-value convention. |
 | Relative illumination | Record image-plane position and field mapping, the image-circle diameter, reference irradiance, source and transmission assumptions, and the spectral conditions. |
-| Analysis evidence | Index available tolerance and ghost studies with source locators, method, scope and simulation or measurement status. Keep physical qualification and trace completeness explicit. |
+| Analysis evidence | Index the availability and useful results of tolerance and ghost studies that apply to the Project revision. Preserve method and scope. Show supporting calculations on request. |
 
 Prioritize wavelength range and configuration, with image circle, effective focal length, f-number, total length and back focal length for the initial imaging records. Expose optional task-specific fields where records support them. For example, a microscope objective can supply object-side NA and working distance. Illumination can supply source and target conditions and output distribution. Attach each value to its configuration and, where relevant, its optical path or output. Keep missing or inapplicable values explicit when requested. Use MTF, CRA, distortion and other condition-specific quantities for general ranking once the collection contains comparable data.
 
-The [camera search evidence proposal](docs/CAMERA_SEARCH_EVIDENCE.md) and its Yutong Cup fixture exercise these distinctions on a frozen record.
+The [camera evidence notes](docs/CAMERA_SEARCH_EVIDENCE.md) describe the Project facts available for camera queries and the historical Yutong Cup fixture.
 
 ## Collection scope
 
@@ -45,8 +45,9 @@ The [camera search evidence proposal](docs/CAMERA_SEARCH_EVIDENCE.md) and its Yu
 
 - For discovery, expose a bounded list of facet values present in the current collection or query scope, with record counts. After a type or function is selected, surface the applicable numerical fields and relevant conditions. Keep the full vocabulary and detailed field definitions available on demand.
 - Resolve aliases to canonical terms. Intersect filters across facets and allow the caller to request alternatives within a facet. Check each label and numerical fact at the scope where it applies. For a projector with an illuminator and an imaging path, an illumination uniformity constraint applies to the requested illumination output.
-- **Specification search** applies the requested constraints to comparable values. An unknown value leaves a requirement unconfirmed. Report the conditions and evidence behind the matches.
-- **Starting-point search** can include near matches. Distinguish fixed requirements from flexible targets and show the differences that affect selection. For example, a 27 mm design can be a useful candidate for a 24 mm brief if its image circle and back focus are close and focal length is flexible.
-- Return a bounded shortlist with record IDs, configurations, selected optical facts, gaps and missing values. When the agent is exploring structures, show representative matches across families and make family variants available on demand. Let the agent expand selected fields, surfaces or groups, then fetch an editable Project by ID and revision. Agents with a known ID can fetch it directly. Bound total batch output and make additional results available from the same index snapshot.
+- **Specification search** applies the requested constraints to comparable Project values. Return each requested result with the conditions needed to interpret it. A fact without a comparable Project value is unconfirmed for that constraint.
+- **Starting-point search** ranks Projects against the caller's flexible targets and preferences. A 27 mm design can be a useful candidate for a 24 mm brief if its image circle and back focus are close and focal length is flexible.
+- Return a bounded shortlist with record IDs, revisions, configurations and the facts that affect this query. Omit unrelated gaps. Comparison, ordinary inspection and Project handoff follow the same scope. Expanded inspection can show selected Project facts, surfaces and supporting calculations. Provenance and any retained transcription detail require an explicit request.
+- Let the agent fetch an editable Project by ID and revision and make family variants available on demand. Bound total batch output and make additional results available from the same index snapshot.
 
 This document establishes the architecture and field semantics. Record layouts, exact band boundaries, database schema and command syntax are implementation decisions to be documented with the first usable package.
