@@ -235,7 +235,7 @@ error):
 | `first_order.engine_check` | engine paraxial values against the source's |
 | `aperture.property_list_comparison`, `field.property_list_comparison` | the collection's property list |
 | `field.prescription_dump_check` | the upstream dump's field table against the design file's |
-| `materials.catalog_comparisons` | published catalog glasses of the same name |
+| `materials.catalog_comparisons`, `materials.named_glasses[].catalog_comparison` | published catalog glasses of the same name (all glasses, or one) |
 
 A new check member must be added to `fact_extraction.check_members` in
 `src/os_optics_lens/vocabulary.json` and to the evaluator.
@@ -269,10 +269,16 @@ References:
 - `path` is corpus-relative with `/` separators, and `sha256` is the SHA-256 of the file's
   LF-normalized bytes.
 
-Strict intake enforces the object root, the `schema` string and the `sections` object
-(`EVIDENCE_MALFORMED`, naming the file and the field; a warning under
-`--allow-unresolved-evidence`, and the reference then stays unresolved). The index stores only
-conforming extracts and re-hashes their bytes on every read.
+Strict intake enforces the object root, the `schema` string and the `sections` object of every
+referenced file. For the file named by `collection.evidence_extract` it also requires the
+top-level `record_id` to be a string equal to that record's `record_id`: the hash proves which
+bytes the record pins, and only `record_id` says they are this record's extract, so a copied or
+mistyped path is caught. A fact `source` may name a section of another record's file; its
+`record_id` is not compared. Each violation is `EVIDENCE_MALFORMED`, naming the file and the
+field, and a warning under `--allow-unresolved-evidence`. The reference then stays unresolved,
+and a rejected `collection.evidence_extract` makes no section addressable through it, even when
+another reference put the same file in the index. The index stores only files that pass the
+checks of the reference that reached them, and re-hashes their bytes on every read.
 
 ## Member types
 
@@ -288,7 +294,7 @@ the field (`INVALID_FIELD` unless noted), never a crash.
 | the same: `conditions` | object or string |
 | the same: `system_aperture` | boolean |
 | the same: `sampled_field_fractions` | non-empty list of finite numbers |
-| the same: `source` | evidence reference object (`EVIDENCE_MALFORMED`, downgradable) |
+| a member named `source` at any depth of the fact data (every top-level member except `collection`, `materials` and the other non-fact members of `fact_extraction.non_fact_sections`; also in `configurations[]` entries and inside lists, e.g. `analysis_evidence.ghost.methods[0].source`) | evidence reference object (`EVIDENCE_MALFORMED`, downgradable). The `source` members of `collection` and `materials` are prose |
 | a section's `<member>_basis` | string |
 | `design.lens_type`, `design.design_scope`, `design.conjugate` | string |
 | `design.module_role` | non-empty string; `null` is invalid (see below) |

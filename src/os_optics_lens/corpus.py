@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .canonical import HEX64, JsonFormatError, corpus_relative_path, is_number, lf, loads_strict, record_hash, sha256_hex
 from .errors import ERROR, WARNING, Finding, LensError, finding, sort_findings
@@ -96,6 +96,36 @@ def evidence_extract_problem(data: Any) -> tuple[str, str] | None:
         if sections[name] is None:
             return f"sections.{name}", f"sections.{name} must not be null"
     return None
+
+
+def non_object_sources(value: Any, path: str) -> Iterator[str]:
+    """Dotted locations, at any depth under `value` (found at `path`), of members named `source`
+    that are neither null nor an object: broken evidence references that name nothing."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            where = f"{path}.{key}" if path else key
+            if key == "source" and item is not None and not isinstance(item, dict):
+                yield where
+            else:
+                yield from non_object_sources(item, where)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from non_object_sources(item, f"{path}[{index}]")
+
+
+def evidence_owner_problem(data: dict[str, Any], rid: str) -> str | None:
+    """Why the extract `data` cannot be the `collection.evidence_extract` of record `rid` (its
+    top-level `record_id` must be that string), else None."""
+    owner = data.get("record_id")
+    if isinstance(owner, str) and owner == rid:
+        return None
+    if "record_id" not in data:
+        found = "it is missing"
+    elif isinstance(owner, str):
+        found = f"it is {owner[:128]!r}"
+    else:
+        found = f"it is {_json_type(owner)}"
+    return f"field record_id: a record's collection.evidence_extract must name that record ({rid!r}), but {found}"
 
 
 @dataclass
@@ -235,7 +265,7 @@ class _Loader:
         if state.parsed is not None or state.problem is not None or state.content is None:
             return
         try:
-            data = loads_strict(state.content)
+            data = loads_strict(state.content, reject_duplicate_keys=True)
         except JsonFormatError as exc:
             state.problem = exc.message
             return
@@ -268,7 +298,7 @@ class _Loader:
     def load_json(self, path: Path, record_id: str | None = None) -> Any:
         file = self.rel(path)
         try:
-            return loads_strict(path.read_bytes())
+            return loads_strict(path.read_bytes(), reject_duplicate_keys=True)
         except JsonFormatError as exc:
             self.add(ERROR, "MALFORMED_JSON", record_id, file, pointer_to_field(exc.pointer), exc.message)
         except OSError as exc:
@@ -359,6 +389,7 @@ class _Loader:
                     for section, member in (("spectrum", "band_facets"), ("image_format", "format_facets")):
                         if isinstance(entry.get(section), dict):
                             self.check_string_list(entry[section], member, f"{prefix}{section}.{member}", rid, file)
+        self.check_source_members(record, rid, file)
         return valid_id if isinstance(valid_id, str) else None
 
     def optional(self, container: dict[str, Any], member: str, check, expectation: str, dotted: str,
@@ -431,9 +462,19 @@ class _Loader:
         self.optional(obj, "sampled_field_fractions",
                       lambda v: isinstance(v, list) and bool(v) and all(is_number(item) for item in v),
                       "a non-empty list of finite numbers or null", f"{where}.sampled_field_fractions", rid, file)
-        if obj.get("source") is not None and not isinstance(obj["source"], dict):
-            self.evidence_problem(MALFORMED, rid, file, f"{where}.source",
-                                  f"{where}.source must be an evidence reference object {{path, sha256, section}}")
+
+    def check_source_members(self, record: dict[str, Any], rid: str | None, file: str) -> None:
+        """A `source` anywhere in the fact data (every member outside `non_fact_sections`, and the
+        `configurations[]` entries; any depth, lists included) is an evidence reference object or
+        null. `collection` and `materials` are not fact data: their `source` members are prose."""
+        non_fact = set(self.vocab.fact_extraction.get("non_fact_sections", []))
+        facts = {key: value for key, value in record.items() if key not in non_fact}
+        locations = list(non_object_sources(facts, ""))
+        if isinstance(record.get("configurations"), list):
+            locations.extend(non_object_sources(record["configurations"], "configurations"))
+        for where in locations:
+            self.evidence_problem(MALFORMED, rid, file, where,
+                                  f"{where} must be an evidence reference object {{path, sha256, section}}")
 
     def check_string_list(self, container: dict[str, Any], member: str, dotted: str, rid: str | None, file: str) -> None:
         if member in container and not (isinstance(container[member], list)
@@ -497,7 +538,7 @@ class _Loader:
                      f"SHA-256 of {rel_path} (LF-normalized) differs from native_project.sha256",
                      expected=state.sha256, actual=stated)
         try:
-            project = loads_strict(state.content or b"")
+            project = loads_strict(state.content or b"", reject_duplicate_keys=True)
         except JsonFormatError as exc:
             self.add(ERROR, "PROJECT_MALFORMED", rid, file, "native_project.path",
                      f"native Project {rel_path} is not valid JSON: {exc.message}")
@@ -553,6 +594,15 @@ class _Loader:
             self.evidence_problem(MALFORMED, rid, file, f"{ref_field}.path",
                                   f"evidence file {rel_path} is malformed: {state.problem}")
             return ref
+        if ref_field == "collection.evidence_extract":
+            # Checked before the file is stored: the hash proves which bytes are pinned, only the
+            # extract's record_id says they are this record's. Section sources may name any file.
+            broken = evidence_owner_problem(state.parsed, rid)
+            if broken is not None:
+                ref.status = MALFORMED
+                self.evidence_problem(MALFORMED, rid, file, f"{ref_field}.path",
+                                      f"evidence file {rel_path} is malformed: {broken}")
+                return ref
         self.evidence_files[rel_path] = (state.sha256, state.content or b"")
         if kind == "source" and state.parsed["sections"].get(section) is None:
             ref.status = SECTION_MISSING

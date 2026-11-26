@@ -244,7 +244,7 @@
       "unsupported_constructs",
       "validation"
     ],
-    "check_members": ["catalog_comparisons", "engine_check", "prescription_dump_check", "property_list_comparison"],
+    "check_members": ["catalog_comparison", "catalog_comparisons", "engine_check", "prescription_dump_check", "property_list_comparison"],
     "skip_members": [
       "application_tags",
       "band_facets",

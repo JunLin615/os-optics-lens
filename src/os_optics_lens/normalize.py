@@ -265,10 +265,13 @@ def configuration_views(record: dict[str, Any], project: Any) -> list[ConfigView
 def unit_for(name: str) -> str | None:
     """The unit implied by a member name (amendment 10.8).
 
-    A trailing `_from_<word>` is stripped, then the longest unit suffix wins (`_lp_mm` -> lp/mm,
-    `_percent`, `_deg`, `_um`, `_nm`, `_mm`); names ending in f_number, numerical_aperture, `_count`,
+    A name containing `_fraction_of_` is a ratio, so dimensionless ("1"). Otherwise a trailing
+    `_from_<word>` is stripped, then the longest unit suffix wins (`_lp_mm` -> lp/mm, `_percent`,
+    `_deg`, `_um`, `_nm`, `_mm`); names ending in f_number, numerical_aperture, `_count`,
     `_fraction` or `_weight` are dimensionless ("1"); otherwise None.
     """
+    if "_fraction_of_" in name:
+        return "1"
     stripped = FROM_SUFFIX.sub("", name)
     for suffix, unit in UNIT_SUFFIXES:
         if stripped.endswith(suffix):

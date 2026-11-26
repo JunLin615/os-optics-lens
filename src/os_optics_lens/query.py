@@ -39,6 +39,7 @@ from .evaluate import (
     DOES_NOT_MATCH,
     MATCH,
     OUTCOMES,
+    SAMPLING_UNSPECIFIED,
     UNCONFIRMED,
     EvalContext,
     RequestError,
@@ -1047,13 +1048,13 @@ def _unknowns(best: _ConfigResult, with_details: bool) -> list[dict[str, Any]]:
     for target in best.targets:
         if "reason" in target:
             item = {"target": target["id"], "fact": target["fact"], "reason": target["reason"]}
-            if with_details and target.get("details"):
+            if (with_details or target["reason"] == SAMPLING_UNSPECIFIED) and target.get("details"):
                 item["details"] = target["details"]
             out.append(item)
     for preference in best.preferences:
         if preference["value"] is None:
             item = {"preference": preference["id"], "fact": preference["fact"], "reason": preference["reason"]}
-            if with_details and preference.get("details"):
+            if (with_details or preference["reason"] == SAMPLING_UNSPECIFIED) and preference.get("details"):
                 item["details"] = preference["details"]
             out.append(item)
     return out
@@ -1835,8 +1836,15 @@ def _evidence_scope(s: _Session, record_pk: int, record: dict[str, Any], configu
     selected = {config["ordinal"]} if configuration is not None else {c["ordinal"] for c in configs}
     scope = _EvidenceScope(selected, {c["ordinal"]: c["configuration_id"] for c in configs}, {}, {})
     candidates: dict[str, set[str]] = {}
+    rows = s.index.evidence_refs(record_pk)
+    # An extract reference the build rejected (--allow-unresolved-evidence) contributes no file,
+    # even when another reference put those bytes in the index (e.g. another record's extract).
+    extract_rejected = any(ref["field"] == "collection.evidence_extract"
+                           and ref["build_status"] not in ("RESOLVED", "SECTION_MISSING") for ref in rows)
     for item in configs:
-        for _, ref in iter_source_refs(item["view"]):
+        for location, ref in iter_source_refs(item["view"]):
+            if extract_rejected and location == "collection.evidence_extract":
+                continue
             path = _evidence_path(ref.get("path"))
             section = ref.get("section") if isinstance(ref.get("section"), str) else None
             scope.pair_refs.setdefault((path, section), set()).add(item["ordinal"])
@@ -1844,13 +1852,13 @@ def _evidence_scope(s: _Session, record_pk: int, record: dict[str, Any], configu
             if item["ordinal"] in selected and path is not None and isinstance(ref.get("sha256"), str):
                 candidates.setdefault(path, set()).add(ref["sha256"])
     extract = (record.get("collection") or {}).get("evidence_extract")
-    if isinstance(extract, dict) and isinstance(extract.get("sha256"), str):
+    if not extract_rejected and isinstance(extract, dict) and isinstance(extract.get("sha256"), str):
         path = _evidence_path(extract.get("path"))
         if path is not None and not scope.excluded_file(path):
             candidates.setdefault(path, set()).add(extract["sha256"])
     # (path, sha256) pairs that reached a stored file at build: failing now means damage. A pair
     # the build rejected (--allow-unresolved-evidence) is merely unresolved.
-    stored_at_build = {(_evidence_path(ref["path"]), ref["sha256"]) for ref in s.index.evidence_refs(record_pk)
+    stored_at_build = {(_evidence_path(ref["path"]), ref["sha256"]) for ref in rows
                        if ref["build_status"] in ("RESOLVED", "SECTION_MISSING") and ref["sha256"] is not None}
     for path in sorted(candidates):
         for sha in sorted(candidates[path]):

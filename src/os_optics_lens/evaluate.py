@@ -116,12 +116,13 @@ _CONFIRMED_COVERAGE_STATES = frozenset({"CONFIRMED", "SOURCE_STATED"})
 _VALUE_MEMBER = re.compile(r"^value(_[a-z_]+)?$")
 _FACT_SYNTAX = re.compile(r"^[^.\s]+(\.[^.\s]+)*$")
 _NOT_FACTS = frozenset({
-    "catalog_comparisons", "engine_check", "prescription_dump_check", "property_list_comparison",
+    "catalog_comparison", "catalog_comparisons", "engine_check", "prescription_dump_check",
+    "property_list_comparison",
 })
 """Provenance checks (docs/RECORD_FORMAT.md): agreement/comparison data kept beside the values,
 never a value. Mirrors `fact_extraction.check_members` in vocabulary.json."""
 _SAMPLING_MEMBER = "sampled_field_fractions"
-_UNPINNED_LIMIT = 6
+_UNPINNED_LIMIT = 16
 _UNPINNED_TEXT_CHARS = 80
 
 _FIXTURE_KEYS = frozenset({
@@ -300,9 +301,12 @@ def _split(path: str) -> list[str]:
 
 
 def unit_for_name(name: str) -> str | None:
-    """Unit implied by a member name (amendment 10.8): strip `_from_<word>`, then the longest
-    suffix wins (`_lp_mm`, `_percent`, `_deg`, `_um`, `_nm`, `_mm`); names ending in f_number,
-    numerical_aperture, `_count`, `_fraction` or `_weight` are dimensionless ("1")."""
+    """Unit implied by a member name (amendment 10.8): a name containing `_fraction_of_` is a
+    ratio ("1"); else strip `_from_<word>`, then the longest suffix wins (`_lp_mm`, `_percent`,
+    `_deg`, `_um`, `_nm`, `_mm`); names ending in f_number, numerical_aperture, `_count`,
+    `_fraction` or `_weight` are dimensionless ("1")."""
+    if "_fraction_of_" in name:
+        return "1"
     stem = re.sub(r"_from_[a-z0-9]+$", "", name)
     for suffix, unit in (("_lp_mm", "lp/mm"), ("_percent", "percent"), ("_deg", "deg"),
                          ("_um", "um"), ("_nm", "nm"), ("_mm", "mm")):
@@ -1450,8 +1454,9 @@ def _unpinned(fact: object, constraint: Mapping[str, Any]) -> dict[str, Any]:
     items: list[tuple[str, Any]] = []
     if isinstance(own, str):
         items.append(("_text", _short(own)))
-    # The sampling grid and the unrequested members of a partly pinned spectrum come first, so the
-    # limit never hides them.
+    # The sampling grid and the unrequested members of a partly pinned spectrum come first. The
+    # limit is above the condition count of any measurement recorded so far, so a condition such as
+    # the spatial frequency is not folded into `_more`.
     if _sampling_grid(fact) is not None and "required_sampled_field_fractions" not in constraint:
         items.append((_SAMPLING_MEMBER, _short(fact[_SAMPLING_MEMBER])))
     if isinstance(own, dict):

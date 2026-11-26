@@ -34,7 +34,7 @@ verify.
 | `CONDITIONS_DIFFER` | no entry has the requested conditions (`details` shows `expected` vs `actual`, or `present: false` for a member the fact does not state) | relax or change `conditions`, or inspect the record |
 | `AMBIGUOUS_FACTS` | more than one entry matches the conditions | pin more conditions or use `select` |
 | `DISCOVERY_ONLY` | the fact is a discovery label (e.g. `spectrum.sampling_span_nm`) | constrain a confirmed fact instead |
-| `COMPARISON_ONLY` | the path reaches (or the compared object contains) a provenance check: `property_list_comparison`, `engine_check`, `prescription_dump_check`, `catalog_comparisons`; never a value | constrain the fact itself |
+| `COMPARISON_ONLY` | the path reaches (or the compared object contains) a provenance check: `property_list_comparison`, `engine_check`, `prescription_dump_check`, `catalog_comparisons`, `catalog_comparison`; never a value | constrain the fact itself |
 | `COVERAGE_UNCONFIRMED` | continuous spectral coverage is not established | treat coverage as open |
 | `SAMPLING_DIFFERS` | the sampled field fractions differ from `required_sampled_field_fractions` (or the fact states none) | inspect the samples |
 | `SAMPLING_UNSPECIFIED` | a target or preference value has a sampling grid that the request does not pin | add `required_sampled_field_fractions` to the target or preference (see `fields --fact`) |
@@ -75,7 +75,8 @@ Targets and preferences use step 1 only. The `stop_state` facet shows the state 
 ## Provenance checks
 
 `engine_check`, `property_list_comparison`, `field.prescription_dump_check` and
-`materials.catalog_comparisons` compare source data. They are provenance, never values:
+`materials.catalog_comparisons` (and a named glass's `catalog_comparison`) compare source data.
+They are provenance, never values:
 
 * they are not typed facts; `inspect --fields` shows them under `checks` of the facts they
   concern (`prescription_dump_check` under every `field.*` fact) and `inspect --sections` shows
@@ -139,7 +140,10 @@ sha256 (over LF bytes) and the section exists. Resolution uses only the index, n
 system. An index built with `--allow-unresolved-evidence` keeps unresolvable references as
 unresolved, which leaves the constraints that need them UNCONFIRMED. Evidence files are JSON
 objects with `schema: "opensci.lens.evidence_extract"` and a `sections` object; only members of
-`sections` can be referenced or inspected (other top-level members are metadata).
+`sections` can be referenced or inspected (other top-level members are metadata). The file named
+by a record's `collection.evidence_extract` must carry that record's id as `record_id`, else the
+build fails (`EVIDENCE_MALFORMED`); under `--allow-unresolved-evidence` that reference stays
+unresolved and `inspect` shows nothing through it.
 
 Every use re-hashes the stored bytes, which must match both the stored digest and the
 reference's: otherwise the status is `HASH_MISMATCH`, constraints that need the evidence are

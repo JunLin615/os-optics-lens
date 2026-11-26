@@ -416,7 +416,7 @@ a cursor. See [Reader compatibility](INDEX_SCHEMA.md#reader-compatibility).
 - **`constraints`** in compact detail:
   - `"MATCH"`: the constraint pinned every structured condition of the matched fact, and the
     fact has no prose conditions.
-  - `{"outcome": "MATCH", "unpinned": {...}}`: up to 6 unpinned keys; prose conditions appear as
+  - `{"outcome": "MATCH", "unpinned": {...}}`: up to 16 unpinned keys; prose conditions appear as
     `_text`.
   - `{"outcome": "UNCONFIRMED", "reason": CODE}`.
   - `{"outcome": "DOES_NOT_MATCH"}`.
@@ -554,7 +554,8 @@ Targets and preferences apply step 1 only. `fields` reports `stop_dependent` per
 ### Provenance checks
 
 `first_order.engine_check`, the `property_list_comparison` of `aperture` and `field`,
-`field.prescription_dump_check` and `materials.catalog_comparisons` compare source data (see
+`field.prescription_dump_check`, `materials.catalog_comparisons` and the per-glass
+`catalog_comparison` of `materials.named_glasses` compare source data (see
 [RECORD_FORMAT.md](RECORD_FORMAT.md#provenance-checks)). They are never values:
 
 - they are not typed facts; `inspect --fields` shows them under `checks` of the facts they concern
@@ -648,7 +649,9 @@ A fact's `source {path, sha256, section}` resolves when the index holds that fil
 SHA-256 over LF bytes and `sections[section]` exists. Resolution reads only the index and never
 the file system, so an installed package answers the same as a checkout. The files follow one
 [evidence extract contract](RECORD_FORMAT.md#evidence-extracts): only members of `sections` are
-addressable.
+addressable, and a record's `collection.evidence_extract` must carry that record's `record_id`.
+In an index built with `--allow-unresolved-evidence`, a rejected `collection.evidence_extract`
+contributes no file or section to `inspect`, even if another record's reference stored the file.
 
 Every use of evidence **verifies the bytes**: the stored content is hashed again and must match
 both the stored digest and the one the reference expects. So every reported status is live:

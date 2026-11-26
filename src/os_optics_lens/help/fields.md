@@ -58,4 +58,5 @@ DERIVED, ENGINE_COMPUTED or OTHER. Structured `conditions` are comparison keys; 
 conditions (`conditions_text`) are information only. `compare` marks rows whose units,
 conditions, qualifiers or sampling grids differ as `comparable: false` with `differs_by`.
 Provenance checks (`engine_check`, `property_list_comparison`, `field.prescription_dump_check`,
-`materials.catalog_comparisons`) are not facts (`help semantics`).
+`materials.catalog_comparisons`, a named glass's `catalog_comparison`) are not facts
+(`help semantics`).

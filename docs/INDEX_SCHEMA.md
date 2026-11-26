@@ -151,7 +151,7 @@ table.** Both come from the same view, so they cannot disagree.
 | `value_num REAL` | the numeric value (performance: `value`, else the first `value_<suffix>`) |
 | `value_min REAL`, `value_max REAL` | interval bounds (`min_nm`/`max_nm`, `min_<s>`/`max_<s>`) |
 | `value_json TEXT` | canonical JSON of the raw value (numbers, lists, strings, booleans, a whole analysis study) |
-| `unit TEXT` | from the member name: `_lp_mm`→`lp/mm`, `_percent`, `_deg`, `_um`, `_nm`, `_mm`. f-number, numerical aperture, `_count`, `_fraction` and `_weight` names → `"1"`. Otherwise NULL |
+| `unit TEXT` | from the member name: a name containing `_fraction_of_` (e.g. `field_fraction_of_stated_half_field`) is a ratio → `"1"`; otherwise `_lp_mm`→`lp/mm`, `_percent`, `_deg`, `_um`, `_nm`, `_mm`. f-number, numerical aperture, `_count`, `_fraction` and `_weight` names → `"1"`. Otherwise NULL |
 | `basis TEXT`, `basis_class TEXT` | the fact's own `basis`, else the sibling `<stem>_basis`, else the section `basis` when it applies (amendment 10.7). `basis_class` is the leading token `SOURCE_STATED`, `DERIVED` or `ENGINE_COMPUTED`, else `OTHER` |
 | `conditions_json TEXT` | canonical JSON of an object `conditions`. Integral floats are normalized to integers, so equal conditions compare equal as text |
 | `conditions_text TEXT` | prose `conditions` string, verbatim (then `conditions_json` is NULL) |
@@ -166,7 +166,8 @@ table.** Both come from the same view, so they cannot disagree.
 | `source_ref_pk INTEGER` | the `evidence_refs` row of the fact's own `source`, else NULL |
 
 Provenance checks (`engine_check`, `property_list_comparison`, `prescription_dump_check`,
-`catalog_comparisons`; `fact_extraction.check_members`) never become facts.
+`catalog_comparisons`, `catalog_comparison`; `fact_extraction.check_members`) never become
+facts.
 
 ### `evidence_files(path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, content BLOB NOT NULL)`
 
@@ -322,7 +323,7 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 
 | code | severity | meaning |
 |---|---|---|
-| `MALFORMED_JSON` | error | Not parseable, not UTF-8, has a BOM, contains `NaN`/`Infinity`/an overflowing number (a float or an integer beyond the double range), a string or member name with a lone surrogate escape, or nesting deeper than 128 levels (field = JSON pointer location), or the top level is not an object (the literal `null` included; no discovered file is skipped). Applies to records and batch manifests; the same defects in a Project or an evidence file are `PROJECT_MALFORMED` and `EVIDENCE_MALFORMED`. |
+| `MALFORMED_JSON` | error | Not parseable, not UTF-8, has a BOM, contains `NaN`/`Infinity`/an overflowing number (a float or an integer beyond the double range), a string or member name with a lone surrogate escape, a member name repeated within one object, or nesting deeper than 128 levels (field = JSON pointer location), or the top level is not an object (the literal `null` included; no discovered file is skipped). Applies to records and batch manifests; the same defects in a Project or an evidence file are `PROJECT_MALFORMED` and `EVIDENCE_MALFORMED`. |
 | `MISSING_FIELD` | error | A required field is absent: `schema`, `record_schema_version`, `record_id`, `record_revision`, `title`, `collection`, `collection.collection_id`, `design`, `native_project`, `native_project.path`, `native_project.sha256`, `spectrum`, `record_hash`, `record_hash_method`; a performance entry's `metric`; a configuration entry's `configuration_id`; a batch manifest's `collection` and `collection.collection_id`. |
 | `INVALID_FIELD` | error | The wrong type or value. Includes: `schema` ≠ `opensci.lens.record`; a `record_id` not matching `^[a-z0-9][a-z0-9._-]{0,127}$`; `record_revision` not an int from 1 to 2^63-1; a tag list that is not a list of strings; a numeric fact `value` (also performance `value*`/`min_*`/`max_*` and spectrum `min_nm`/`max_nm`) that is not a finite number or null; `performance` not a list; a 1.0 record carrying `configurations`; malformed or unknown configuration-entry keys; a top-level section that some configuration would inherit; any member of [RECORD_FORMAT.md, Member types](RECORD_FORMAT.md#member-types) with another type, at the top level or in a configuration entry. |
 | `UNSUPPORTED_SCHEMA_VERSION` | error | `record_schema_version` is not `1.0` or `1.1`. |
@@ -353,7 +354,7 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 | `EVIDENCE_FILE_MISSING` † | error | A referenced evidence file does not exist. |
 | `EVIDENCE_HASH_MISMATCH` † | error | The SHA-256 of the file's LF bytes differs from the reference's `sha256`. |
 | `EVIDENCE_SECTION_MISSING` † | error | The file has no `sections.<section>`. |
-| `EVIDENCE_MALFORMED` † | error | The reference has an empty or missing `path`/`section` or a non-hex `sha256`; a fact `source` or `collection.evidence_extract` is not an object; or the file breaks the [evidence extract contract](RECORD_FORMAT.md#evidence-extracts) (the message names the file and the field: root, `schema`, `sections` or `sections.<name>`). |
+| `EVIDENCE_MALFORMED` † | error | The reference has an empty or missing `path`/`section` or a non-hex `sha256`; a `source` member at any depth of the fact data (lists and `configurations[]` entries included) or `collection.evidence_extract` is not an object; or the file breaks the [evidence extract contract](RECORD_FORMAT.md#evidence-extracts) (the message names the file and the field: root, `schema`, `sections`, `sections.<name>`, or, for the file named by `collection.evidence_extract`, a `record_id` that is not the string naming that record). |
 | `LICENSE_NOTICE_MISSING` † | error | `collection.license.notice_path` is null, empty or not a string, or names no UTF-8 text file. |
 | `LICENSE_NOTICE_MISMATCH` † | error | The notice does not contain `collection.license.copyright`. |
 | `LICENSE_UNREADABLE` | error | `LICENSE` or `licenses/*.txt` is not UTF-8 text. |

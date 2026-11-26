@@ -31,8 +31,11 @@ if str(SRC) not in sys.path:
 
 from os_optics_lens import output, query, semantics  # noqa: E402
 from os_optics_lens.build import build_index  # noqa: E402
-from os_optics_lens.corpus import load_corpus  # noqa: E402
+from os_optics_lens.canonical import record_hash  # noqa: E402
+from os_optics_lens.corpus import evidence_owner_problem, load_corpus, non_object_sources  # noqa: E402
 from os_optics_lens.errors import LensError  # noqa: E402
+from os_optics_lens.evaluate import unit_for_name  # noqa: E402
+from os_optics_lens.normalize import unit_for  # noqa: E402
 from os_optics_lens.store import Index, open_index, resolve_source_in  # noqa: E402
 
 
@@ -260,6 +263,39 @@ class IntakeCase(CliCase):
         path = self.root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(text.encode("utf-8"))
+
+
+class DuplicateMemberCli(IntakeCase):
+    """A repeated member name would otherwise be resolved silently (the last one wins), and the
+    record hash, computed from the parsed record, cannot see it."""
+
+    def test_repeated_member_names_are_findings_and_keep_the_previous_index(self) -> None:
+        self.corpus.add("rec-a")
+        out = self.work / "index.sqlite"
+        self.ok("index", "build", "--corpus", str(self.root), "--out", str(out))
+        before = out.read_bytes()
+        record = "records/synth/rec-a/record.json"
+        project = "records/synth/rec-a/project.json"
+        cases = ((record, "MALFORMED_JSON"), (project, "PROJECT_MALFORMED"),
+                 ("records/synth/batch-dup.json", "MALFORMED_JSON"))
+        for relative, code in cases:
+            with self.subTest(file=relative):
+                path = self.root / relative
+                original = path.read_bytes() if path.is_file() else None
+                text = original.decode("utf-8") if original else "{}"
+                body = text.lstrip()[1:].lstrip()
+                separator = "" if body.startswith("}") else ","
+                self.write(relative, '{"schema": "first", "schema": "second"' + separator + body)
+                error = self.fails("BUILD_FAILED", 6, "index", "build", "--corpus", str(self.root),
+                                   "--out", str(out))
+                codes = {f["code"] for f in error["details"]["findings"]}
+                self.assertIn(code, codes)
+                self.assertEqual(out.read_bytes(), before)
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(original)
+        self.ok("index", "validate", "--corpus", str(self.root))
 
 
 class BadRootsCli(IntakeCase):
@@ -533,7 +569,7 @@ class SemanticsBindingCli(CliCase):
 
     def test_query_code_changes_reject_cursors_but_not_the_index(self) -> None:
         cursor = self.cursor()
-        reader = reader_copy("evaluate", edit=("evaluate.py", '_UNPINNED_LIMIT = 6\n', '_UNPINNED_LIMIT = 7\n'))
+        reader = reader_copy("evaluate", edit=("evaluate.py", '_UNPINNED_LIMIT = 16\n', '_UNPINNED_LIMIT = 17\n'))
         self.ok("info", index=INDEX, package_root=reader)
         self.fails("CURSOR_SEMANTICS_MISMATCH", 4, "search", index=INDEX, request={**PAGED, "cursor": cursor},
                    package_root=reader)
@@ -677,6 +713,172 @@ class EvidenceContractCli(IntakeCase):
     def test_committed_extracts_comply(self) -> None:
         findings = load_corpus(ROOT).findings
         self.assertEqual([f.to_dict() for f in findings if f.severity == "error"], [])
+
+
+class EvidenceOwnerCli(IntakeCase):
+    """`collection.evidence_extract` must pin an extract whose `record_id` names this record."""
+
+    def add_record(self, record_id: str, extract_of: str, extra: dict[str, Any] | None = None) -> None:
+        """A record whose collection.evidence_extract is the extract file written by `extract_of`."""
+        payload = (self.root / self.extract_path(extract_of)).read_bytes()
+        reference = {"path": self.extract_path(extract_of), "sha256": hashlib.sha256(payload).hexdigest(),
+                     **(extra or {})}
+        self.corpus.add(record_id, with_evidence=False,
+                        mutate=lambda record: record["collection"].__setitem__("evidence_extract", reference))
+
+    @staticmethod
+    def extract_path(record_id: str) -> str:
+        return f"records/synth/{record_id}/extract.json"
+
+    def write_extract(self, directory: str, **members: Any) -> None:
+        self.write(self.extract_path(directory), json.dumps(
+            {"schema": "opensci.lens.evidence_extract", "sections": {"prescription": {"rows": [1]}}, **members}))
+
+    def test_missing_mistyped_or_foreign_record_id_is_malformed(self) -> None:
+        for members, found in (({}, "it is missing"), ({"record_id": ["x"]}, "it is a list"),
+                               ({"record_id": None}, "it is null"),
+                               ({"record_id": "some-other-record"}, "it is 'some-other-record'")):
+            for extra in (None, {"section": "prescription"}):
+                with self.subTest(members=members, extra=extra):
+                    shutil.rmtree(self.root / "records", ignore_errors=True)
+                    self.write_extract("rec-a", **members)
+                    self.add_record("rec-a", "rec-a", extra)
+                    [error] = self.validate_errors()
+                    self.assertEqual((error["code"], error["field"], error["record_id"]),
+                                     ("EVIDENCE_MALFORMED", "collection.evidence_extract.path", "rec-a"))
+                    for text in (self.extract_path("rec-a"), "field record_id", found):
+                        self.assertIn(text, error["message"])
+                    self.fails("BUILD_FAILED", 6, "index", "build", "--corpus", str(self.root), "--out",
+                               str(self.work / "x.sqlite"))
+
+    def test_another_records_extract_is_never_shown(self) -> None:
+        self.write_extract("rec-a", record_id="rec-a")
+        self.add_record("rec-a", "rec-a")
+        for extra in (None, {"section": "prescription"}):
+            with self.subTest(extra=extra):
+                shutil.rmtree(self.root / "records/synth/rec-b", ignore_errors=True)
+                self.add_record("rec-b", "rec-a", extra)
+                self.assertEqual({(f["code"], f["record_id"]) for f in self.validate_errors()},
+                                 {("EVIDENCE_MALFORMED", "rec-b")})
+                out = self.work / "allowed.sqlite"
+                doc = self.ok("index", "build", "--corpus", str(self.root), "--out", str(out),
+                              "--allow-unresolved-evidence")
+                self.assertIn(("warning", "EVIDENCE_MALFORMED", "rec-b"),
+                              {(f["severity"], f["code"], f["record_id"]) for f in doc["result"]["findings"]})
+                # rec-a stored the bytes; rec-b's rejected reference still reaches none of them.
+                own = self.ok("inspect", "rec-a", "--evidence", "prescription", index=out)["result"]
+                self.assertEqual(list(own["evidence_sections"]), [self.extract_path("rec-a")])
+                listing = self.ok("inspect", "rec-b", index=out)["result"]["evidence"]
+                self.assertEqual((listing["sections"], listing["files"]), ({}, {}))
+                self.assertEqual({r["status"] for r in listing["refs"]}, {"MALFORMED"})
+                self.fails("EVIDENCE_SECTION_NOT_FOUND", 3, "inspect", "rec-b", "--evidence", "prescription",
+                           index=out)
+                shown = self.ok("inspect", "rec-b", "--evidence", "all", index=out)["result"]
+                self.assertEqual(shown["evidence_sections"], {})
+
+    def test_section_sources_may_name_another_records_file(self) -> None:
+        self.write_extract("rec-a", record_id="rec-a")
+        self.add_record("rec-a", "rec-a")
+        digest = hashlib.sha256((self.root / self.extract_path("rec-a")).read_bytes()).hexdigest()
+        source = {"path": self.extract_path("rec-a"), "sha256": digest, "section": "prescription"}
+        self.corpus.add("rec-b", with_evidence=False, mutate=lambda record: record.__setitem__(
+            "performance", [{"metric": "m", "value": 1, "source": source}]))
+        doc = self.ok("index", "validate", "--corpus", str(self.root))
+        self.assertEqual([f for f in doc["result"]["findings"] if f["code"].startswith("EVIDENCE_")], [])
+
+    def test_owner_check(self) -> None:
+        self.assertIsNone(evidence_owner_problem({"record_id": "rec-a"}, "rec-a"))
+        for document in ({}, {"record_id": "rec-b"}, {"record_id": ["rec-a"]}, {"record_id": 1},
+                         {"record_id": None}, {"record_id": {"a": 1}}):
+            self.assertIn("field record_id", evidence_owner_problem(document, "rec-a"), document)
+
+
+class SourceMemberCli(IntakeCase):
+    """A `source` anywhere in the fact data is an evidence reference object or null."""
+
+    BAD = ("records/synth/rec-a/evidence.json#mtf", ["not", "a", "ref"], [{"path": "does/not/exist.json"}], 3)
+
+    def yutong_copy(self, mutate) -> None:
+        """The committed camera collection in the scratch corpus, with P2b mutated and rehashed."""
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.copytree(ROOT / "records/yutong-cup", self.root / "records/yutong-cup")
+        shutil.copytree(ROOT / "licenses", self.root / "licenses")
+        shutil.copyfile(ROOT / "LICENSE", self.root / "LICENSE")
+        path = self.root / "records/yutong-cup" / P2B / "record.json"
+        record = json.loads(path.read_bytes())
+        mutate(record)
+        record["record_hash"] = record_hash(record)
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def test_nested_non_object_sources_fail_strict_intake(self) -> None:
+        def methods(record: dict[str, Any]) -> None:
+            for method in record["analysis_evidence"]["ghost"]["methods"]:
+                method["source"] = self.BAD[0]
+
+        def gate(record: dict[str, Any]) -> None:
+            record["analysis_evidence"]["tolerance"]["mtf_gate"]["source"] = self.BAD[1]
+
+        def listed(record: dict[str, Any]) -> None:
+            record["analysis_evidence"]["ghost"]["methods"][0]["source"] = self.BAD[2]
+
+        count = len(json.loads((ROOT / "records/yutong-cup" / P2B / "record.json").read_bytes())
+                    ["analysis_evidence"]["ghost"]["methods"])
+        for mutate, fields in (
+                (methods, {f"analysis_evidence.ghost.methods[{i}].source" for i in range(count)}),
+                (gate, {"analysis_evidence.tolerance.mtf_gate.source"}),
+                (listed, {"analysis_evidence.ghost.methods[0].source"})):
+            with self.subTest(case=mutate.__name__):
+                self.yutong_copy(mutate)
+                errors = self.validate_errors()
+                self.assertEqual({(f["code"], f["file"], f["field"]) for f in errors},
+                                 {("EVIDENCE_MALFORMED", f"records/yutong-cup/{P2B}/record.json", name)
+                                  for name in fields})
+                self.fails("BUILD_FAILED", 6, "index", "build", "--corpus", str(self.root), "--out",
+                           str(self.work / "x.sqlite"))
+                doc = self.ok("index", "validate", "--corpus", str(self.root), "--allow-unresolved-evidence")
+                self.assertEqual({(f["severity"], f["code"], f["field"]) for f in doc["result"]["findings"]
+                                  if f["code"].startswith("EVIDENCE_")},
+                                 {("warning", "EVIDENCE_MALFORMED", name) for name in fields})
+
+    def test_every_depth_of_the_fact_data_is_checked_and_prose_sources_are_not(self) -> None:
+        def mutate(record: dict[str, Any]) -> None:
+            record["collection"]["source"] = "a publication"
+            record["materials"] = {"model_glasses": [{"source": "a table"}]}
+            record["design"]["history"] = {"steps": [[{"source": self.BAD[3]}]]}
+            record["first_order"]["effective_focal_length_mm"]["detail"] = {"source": self.BAD[0]}
+            record["performance"][0]["samples"] = [{"source": None}, {"source": self.BAD[1]}]
+            record["extra_section"] = {"member": {"source": self.BAD[0]}}
+
+        self.corpus.add("rec-a", mutate=mutate)
+        self.assertEqual({(f["code"], f["field"]) for f in self.validate_errors()}, {
+            ("EVIDENCE_MALFORMED", name) for name in (
+                "design.history.steps[0][0].source", "first_order.effective_focal_length_mm.detail.source",
+                "performance[0].samples[1].source", "extra_section.member.source")})
+
+    def test_walk(self) -> None:
+        data = {"a": {"source": "x"}, "b": [{"source": {"path": 1}}, {"source": None}, [{"source": []}]]}
+        self.assertEqual(list(non_object_sources(data, "")), ["a.source", "b[2][0].source"])
+        self.assertEqual(list(non_object_sources([{"source": True}], "configurations")),
+                         ["configurations[0].source"])
+
+
+class FractionOfUnitCli(IntakeCase):
+    def test_a_fraction_of_something_is_dimensionless(self) -> None:
+        name = "field_fraction_of_stated_half_field"
+        self.corpus.add("rec-a", mutate=lambda record: record.__setitem__("image_format", {name: 0.8}))
+        doc = self.ok("index", "validate", "--corpus", str(self.root))
+        self.assertNotIn("UNIT_UNKNOWN", {f["code"] for f in doc["result"]["findings"]})
+        out = self.work / "index.sqlite"
+        self.ok("index", "build", "--corpus", str(self.root), "--out", str(out))
+        field = self.ok("fields", "--fact", f"image_format.{name}", index=out)["result"]
+        self.assertIn('"unit": "1"', json.dumps(field))
+
+    def test_build_and_evaluator_helpers_agree(self) -> None:
+        for name in ("field_fraction_of_stated_half_field", "x_fraction_of_height_mm",
+                     "y_fraction_of_field_from_dump", "z_fraction_of_nm"):
+            self.assertEqual((unit_for(name), unit_for_name(name)), ("1", "1"), name)
+        self.assertEqual((unit_for("height_mm"), unit_for_name("height_mm")), ("mm", "mm"))
+        self.assertEqual((unit_for("fraction_kind"), unit_for_name("fraction_kind")), (None, None))
 
 
 class WheelEvidenceCheckTests(unittest.TestCase):

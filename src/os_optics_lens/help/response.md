@@ -61,7 +61,7 @@ A candidate (one record, at its best configuration):
 ```
 
 * `constraints` (compact): `"MATCH"` when the constraint pinned every condition of the matched
-  fact; `{"outcome": "MATCH", "unpinned": {...}}` when it did not (up to 6 keys; prose conditions
+  fact; `{"outcome": "MATCH", "unpinned": {...}}` when it did not (up to 16 keys; prose conditions
   as `_text`); `{"outcome": "UNCONFIRMED", "reason": CODE}`; `{"outcome": "DOES_NOT_MATCH"}`.
   With `detail: "full"` each entry is the full evaluation: `outcome`, `reason`, `details`,
   `shortfalls`, `unpinned`, `fact` (json_path, value, unit, basis, conditions, source with its

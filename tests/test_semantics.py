@@ -218,7 +218,8 @@ class Shorthand(unittest.TestCase):
         entry = candidate["constraints"]["k"]
         self.assertEqual(entry["outcome"], "MATCH")
         self.assertIn("unpinned", entry)
-        self.assertLessEqual(len(entry["unpinned"]), 6)
+        self.assertLessEqual(len(entry["unpinned"]), 16)
+        self.assertNotIn("_more", entry["unpinned"])
         self.assertNotIn("frequency_lp_mm", entry["unpinned"])
         _, candidate = evaluate(P2B, {"fact": "first_order.effective_focal_length_mm", "op": "gt", "value": 0},
                                 detail="compact")

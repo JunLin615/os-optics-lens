@@ -248,6 +248,15 @@ class ProvenanceCheckCli(CliTestCase):
                 result = self.candidate(DUMP_RECORD, {"id": "c", **constraint})["constraints"]["c"]
                 self.assertEqual((result["outcome"], result.get("reason")), ("UNCONFIRMED", "COMPARISON_ONLY"), result)
 
+    def test_per_glass_catalog_comparison_is_comparison_only(self) -> None:
+        record_id = "lenslibrary-4037934a"
+        glasses = json.loads((ROOT / "records/lenslibrary" / record_id / "record.json").read_text(
+            encoding="utf-8"))["materials"]["named_glasses"]
+        self.assertTrue(any("catalog_comparison" in glass for glass in glasses))
+        constraint = {"id": "c", "fact": "materials.named_glasses", "op": "eq", "value": glasses}
+        result = self.candidate(record_id, constraint)["constraints"]["c"]
+        self.assertEqual((result["outcome"], result.get("reason")), ("UNCONFIRMED", "COMPARISON_ONLY"), result)
+
     def test_naming_the_check_is_an_error_with_a_provenance_hint(self) -> None:
         requests = (
             {"mode": "starting_point", "targets": [{"fact": CHECK, "target": 1}]},
@@ -485,6 +494,23 @@ class SamplingGridCli(CliTestCase):
                           "--prefer", f"{MTF}:desc", "--target", f"{MTF}=0.7", index=INDEX)
         [candidate] = doc["result"]["candidates"]
         self.assertEqual([u["reason"] for u in candidate["unknowns"]], ["SAMPLING_UNSPECIFIED"] * 2)
+
+    def test_compact_ranking_unknown_says_how_to_pin_the_grid(self) -> None:
+        request = {"mode": "starting_point", "filters": {"record_ids": [P2B]},
+                   "preferences": [{"fact": MTF, "direction": "descending"}]}
+        [candidate] = self.cli_ok("search", request=request, index=INDEX)["result"]["candidates"]
+        [unknown] = candidate["unknowns"]
+        self.assertEqual(unknown["reason"], "SAMPLING_UNSPECIFIED")
+        self.assertEqual(len(unknown["details"]["actual"]), 11)
+        self.assertIn("required_sampled_field_fractions", unknown["details"]["hint"])
+
+    def test_compact_match_keeps_every_unpinned_mtf_condition_visible(self) -> None:
+        constraint = {"id": "m", "fact": MTF, "op": "gt", "value": 0.5}
+        request = {"mode": "specification", "filters": {"record_ids": [P2B]}, "constraints": [constraint]}
+        [candidate] = self.cli_ok("search", request=request, index=INDEX)["result"]["candidates"]
+        unpinned = candidate["constraints"]["m"]["unpinned"]
+        self.assertEqual(unpinned["frequency_lp_mm"], 40)
+        self.assertNotIn("_more", unpinned)
 
     def test_unpinned_grid_is_reported_on_a_hard_match(self) -> None:
         constraint = {"id": "m", "fact": MTF, "op": "gt", "value": 0.5}
