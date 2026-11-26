@@ -107,10 +107,12 @@ An unknown operator is `UNSUPPORTED_OPERATOR`.
 `normalized = |value - target| / scale`; scale = `tolerance`, else `relative_tolerance * |target|`,
 else `|target|`, else 1. The scale must be a normal positive number, and a normalized deviation
 or weighted score (sum of `weight * normalized`) that is not finite is `INVALID_REQUEST`. A target
-needs exactly one comparable numeric value, otherwise it is an unknown with a reason code. Interval
-facts cannot be targets. A value with a sampling grid is unknown `SAMPLING_UNSPECIFIED` unless the
-target pins it with `required_sampled_field_fractions` (a different grid is `SAMPLING_DIFFERS`).
-Provenance checks (`help semantics`) cannot be targets or preferences.
+needs exactly one comparable numeric value per configuration. A sampled target can use the
+shared grid of the eligible values. Set `required_sampled_field_fractions` to select an exact
+ordered grid. A different or missing grid then yields `SAMPLING_DIFFERS`. See `help semantics`
+for comparability across configurations.
+Use Project facts as targets and preferences. `help semantics` describes how search handles
+requests for source comparisons.
 
 ## Preferences
 
@@ -158,9 +160,8 @@ cursor is `CURSOR_INVALID`: then restart without a cursor.
 | `--include MATCH,UNCONFIRMED` | `include` |
 | `--hard-shortfall allow` | `hard_shortfall` |
 
-The quick flags cannot pin a sampling grid; for `--target`/`--prefer` on a sampled value (such as
-`performance.mtf_field_minimum`) write the request and pass `--request FILE` with
-`required_sampled_field_fractions`.
+`--target` and `--prefer` can rank values from a shared, comparable sampling grid. To pin an
+exact grid, use `--request FILE` and set `required_sampled_field_fractions` in the JSON request.
 
 `--fields`, `--detail`, `--limit`, `--cursor` and `--max-output-bytes` also combine with a
 single-query `--request FILE`. `--fixture FILE` runs an acceptance fixture (specification mode,

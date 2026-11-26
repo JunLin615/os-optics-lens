@@ -240,13 +240,14 @@ def build_parser() -> JsonArgumentParser:
     p.set_defaults(handler=_cmd_compare)
 
     p = _add_command(
-        subparsers, common, "inspect", "Inspect one record: identity, provenance, configurations, facts, evidence.",
-        "The default output is a summary listing the fact keys and evidence sections available; ask for\n"
-        "facts, view sections, evidence sections or the prescription explicitly.",
+        subparsers, common, "inspect", "Inspect a record's configurations and Project facts.",
+        "The default summary lists available fact keys and supporting calculations. Select facts, view\n"
+        "sections, evidence sections, the prescription or direct provenance with the options below.",
         [f"{PROG} inspect yutong-2025-mirrorless-18-p2b",
          f"{PROG} inspect yutong-2025-mirrorless-18-p2b --fields performance.mtf_field_minimum",
          f"{PROG} inspect yutong-2025-mirrorless-18-p2b --evidence all --max-output-bytes 65536",
-         f"{PROG} inspect lenslibrary-528155 --prescription summary"])
+         f"{PROG} inspect lenslibrary-528155 --prescription summary",
+         f"{PROG} inspect lenslibrary-528155 --provenance"])
     p.add_argument("record_id", metavar="RECORD_ID")
     p.add_argument("--revision", type=int, metavar="N", help="fail unless the index holds this revision")
     p.add_argument("--configuration", metavar="ID",
@@ -256,12 +257,13 @@ def build_parser() -> JsonArgumentParser:
     p.add_argument("--evidence", action="append", metavar="S|PATH#S|all",
                    help="evidence sections by name, path#section, or all")
     p.add_argument("--prescription", choices=query.PRESCRIPTION_LEVELS, help="native Project optical model")
+    p.add_argument("--provenance", action="store_true", help="direct source, attribution and license terms")
     _budget_option(p)
     p.set_defaults(handler=_cmd_inspect)
 
     p = _add_command(
         subparsers, common, "project", "Hand off a record's native os-optics Project.",
-        "Without --out/--stdout: metadata only (sha256, size, configurations, license). --out writes the\n"
+        "Without --out/--stdout, show metadata (sha256, size, configurations). --out writes the\n"
         "exact bytes (sha256 == the record's native_project.sha256), creating parent directories and\n"
         "refusing to overwrite unless --force. --stdout writes the raw bytes and nothing else. On Windows\n"
         "PowerShell 5.1 use --out: '>' redirection re-encodes the bytes.",
@@ -685,7 +687,7 @@ def _cmd_inspect(args: argparse.Namespace) -> dict[str, Any]:
         return query.inspect(
             index, args.record_id, revision=args.revision, configuration=args.configuration,
             fields=_comma_list(args.fields), sections=_comma_list(args.sections),
-            evidence=_comma_list(args.evidence), prescription=args.prescription,
+            evidence=_comma_list(args.evidence), prescription=args.prescription, provenance=args.provenance,
             max_output_bytes=_budget(args))
 
 

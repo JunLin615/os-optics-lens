@@ -232,30 +232,23 @@ CHECK = "field.prescription_dump_check"
 
 class ProvenanceCheckCli(CliTestCase):
     def test_constraints_reaching_the_check_are_comparison_only(self) -> None:
-        whole = copy.deepcopy(json.loads(
-            (ROOT / "records/lenslibrary" / DUMP_RECORD / "record.json").read_text(encoding="utf-8"))["field"])
         constraints = (
             {"fact": CHECK, "op": "eq", "value": "MATCHES"},
             {"scope": ["field"], "predicates": [{"path": "prescription_dump_check", "op": "eq", "value": "MATCHES"}]},
             {"scope": ["field", "prescription_dump_check"], "predicates": [{"path": "", "op": "eq", "value": "x"}]},
-            {"scope": ["field"], "predicates": [{"path": "", "op": "eq", "value": whole}]},
-            {"fact": "field", "path": "", "op": "ne", "value": 1},
             {"fact": "materials.catalog_comparisons", "op": "eq", "value": []},
-            {"scope": ["materials"], "predicates": [{"path": "", "op": "ne", "value": 1}]},
         )
         for constraint in constraints:
             with self.subTest(constraint=constraint):
                 result = self.candidate(DUMP_RECORD, {"id": "c", **constraint})["constraints"]["c"]
                 self.assertEqual((result["outcome"], result.get("reason")), ("UNCONFIRMED", "COMPARISON_ONLY"), result)
 
-    def test_per_glass_catalog_comparison_is_comparison_only(self) -> None:
-        record_id = "lenslibrary-4037934a"
-        glasses = json.loads((ROOT / "records/lenslibrary" / record_id / "record.json").read_text(
-            encoding="utf-8"))["materials"]["named_glasses"]
-        self.assertTrue(any("catalog_comparison" in glass for glass in glasses))
-        constraint = {"id": "c", "fact": "materials.named_glasses", "op": "eq", "value": glasses}
-        result = self.candidate(record_id, constraint)["constraints"]["c"]
-        self.assertEqual((result["outcome"], result.get("reason")), ("UNCONFIRMED", "COMPARISON_ONLY"), result)
+    def test_raw_field_and_glass_data_are_unavailable_to_constraints(self) -> None:
+        for record_id, key in ((DUMP_RECORD, "field"), ("lenslibrary-4037934a", "materials.named_glasses")):
+            with self.subTest(record_id=record_id, key=key):
+                constraint = {"id": "c", "fact": key, "path": "", "op": "ne", "value": 1}
+                result = self.candidate(record_id, constraint)["constraints"]["c"]
+                self.assertEqual((result["outcome"], result.get("reason")), ("UNCONFIRMED", "FACT_MISSING"), result)
 
     def test_naming_the_check_is_an_error_with_a_provenance_hint(self) -> None:
         requests = (
@@ -277,19 +270,20 @@ class ProvenanceCheckCli(CliTestCase):
                                      "first_order.engine_check"))
         for error in errors:
             self.assertIn("provenance check that cannot be matched or ranked", error["hint"], error)
+            self.assertIn("inspect <record_id> --provenance", error["hint"])
             self.assertIn("provenance_check", error["details"])
 
-    def test_check_stays_visible_as_provenance(self) -> None:
+    def test_intake_checks_are_omitted_from_inspection(self) -> None:
         listed = self.cli_ok("fields", "--prefix", "field.")["result"]["fields"]
         self.assertNotIn(CHECK, listed)
-        inspected = self.cli_ok("inspect", DUMP_RECORD, "--fields", "field", "--sections", "field")["result"]
-        self.assertEqual(inspected["sections"]["field"]["prescription_dump_check"], "MATCHES")
+        inspected = self.cli_ok("inspect", DUMP_RECORD, "--fields", "first_order", "--sections", "first_order",
+                                "--provenance")["result"]
         self.assertNotIn(CHECK, inspected["fact_keys"])
-        self.assertGreater(len(inspected["fields"]), 1)
-        for key, item in inspected["fields"].items():
-            self.assertEqual(item["checks"]["prescription_dump_check"], "MATCHES", key)
-        one = self.cli_ok("inspect", DUMP_RECORD, "--fields", "field.half_field_deg")["result"]["fields"]
-        self.assertEqual(one["field.half_field_deg"]["checks"]["prescription_dump_check"], "MATCHES")
+        self.assertNotIn("engine_check", inspected["sections"]["first_order"])
+        self.assertTrue(inspected["fields"])
+        for item in inspected["fields"].values():
+            self.assertNotIn("checks", item)
+        self.assertNotIn("source_prescription_dump", inspected["provenance"])
 
 
 class ProvenanceCheckUnit(unittest.TestCase):
@@ -314,9 +308,11 @@ EXTREMES = (HUGE, -HUGE, 5e-324, -5e-324, 1e-308, 0, 10 ** 308, -(10 ** 308), 1)
 
 def extreme_values(record: dict[str, Any]) -> None:
     record["first_order"]["effective_focal_length_mm"]["value"] = 10 ** 308
-    record["first_order"]["back_focal_length_mm"] = {"value": -HUGE}
-    record["first_order"]["total_track_mm"] = {"value": 5e-324}
-    record["spectrum"]["continuous_coverage_nm"] = {"state": "CONFIRMED", "min_nm": -(10 ** 308), "max_nm": HUGE}
+    record["first_order"]["back_focal_length_mm"] = {"value": -HUGE, "basis": "ENGINE_COMPUTED"}
+    record["first_order"]["total_track_mm"] = {"value": 5e-324, "basis": "PROJECT_DERIVED"}
+    record["spectrum"]["continuous_coverage_nm"] = {
+        "state": "CONFIRMED", "min_nm": -(10 ** 308), "max_nm": HUGE, "basis": "ENGINE_COMPUTED",
+    }
 
 
 class FiniteArithmeticCli(CliTestCase):
@@ -408,7 +404,7 @@ SWEEPS = {"sweep3": [0, 0.4, 0.8], "sweep5": [0, 0.2, 0.4, 0.6, 0.8], "nogrid": 
 
 def sweep(grid: list[float] | None):
     def mutate(record: dict[str, Any]) -> None:
-        entry = {"metric": "mtf_field_minimum", "basis": "DERIVED", "value": 0.7,
+        entry = {"metric": "mtf_field_minimum", "basis": "ENGINE_COMPUTED", "value": 0.7,
                  "conditions": {"frequency_lp_mm": 40, "field_start": 0, "field_end": 0.8}}
         if grid is not None:
             entry["sampled_field_fractions"] = grid
@@ -469,14 +465,14 @@ class SamplingGridCli(CliTestCase):
         doc = self.cli_ok("search", request={"mode": "starting_point", **extra})
         return {c["record_id"]: c for c in doc["result"]["candidates"]}
 
-    def test_unpinned_grids_are_never_ranked(self) -> None:
+    def test_mixed_unpinned_grids_are_never_ranked_against_each_other(self) -> None:
         for extra in ({"preferences": [{"fact": MTF, "direction": "descending"}]},
                       {"targets": [{"fact": MTF, "target": 0.7}]}):
             with self.subTest(extra=extra):
                 ranked = self.ranked(**extra)
-                for record_id, grid in SWEEPS.items():
+                for record_id in SWEEPS:
                     reasons = [u["reason"] for u in ranked[record_id]["unknowns"]]
-                    self.assertEqual(reasons, [] if grid is None else ["SAMPLING_UNSPECIFIED"], record_id)
+                    self.assertEqual(reasons, ["SAMPLING_UNSPECIFIED"], record_id)
 
     def test_pinned_grid_ranks_only_that_grid(self) -> None:
         pin = {"required_sampled_field_fractions": SWEEPS["sweep5"]}
@@ -489,19 +485,19 @@ class SamplingGridCli(CliTestCase):
                 for record_id in ("sweep3", "nogrid"):
                     self.assertEqual([u["reason"] for u in ranked[record_id]["unknowns"]], ["SAMPLING_DIFFERS"])
 
-    def test_quick_flags_cannot_pin_a_grid(self) -> None:
+    def test_quick_flags_rank_values_on_an_implicit_grid(self) -> None:
         doc = self.cli_ok("search", "--mode", "starting_point", "--record-id", P2B,
                           "--prefer", f"{MTF}:desc", "--target", f"{MTF}=0.7", index=INDEX)
         [candidate] = doc["result"]["candidates"]
-        self.assertEqual([u["reason"] for u in candidate["unknowns"]], ["SAMPLING_UNSPECIFIED"] * 2)
+        self.assertEqual(candidate["unknowns"], [])
+        self.assertEqual(candidate["rank"]["key"][2], 0)
+        self.assertEqual(candidate["rank"]["key"][4][0], 0)
 
     def test_compact_ranking_unknown_says_how_to_pin_the_grid(self) -> None:
-        request = {"mode": "starting_point", "filters": {"record_ids": [P2B]},
-                   "preferences": [{"fact": MTF, "direction": "descending"}]}
-        [candidate] = self.cli_ok("search", request=request, index=INDEX)["result"]["candidates"]
-        [unknown] = candidate["unknowns"]
+        ranked = self.ranked(preferences=[{"fact": MTF, "direction": "descending"}])
+        [unknown] = ranked["sweep3"]["unknowns"]
         self.assertEqual(unknown["reason"], "SAMPLING_UNSPECIFIED")
-        self.assertEqual(len(unknown["details"]["actual"]), 11)
+        self.assertEqual(unknown["details"]["actual"], SWEEPS["sweep3"])
         self.assertIn("required_sampled_field_fractions", unknown["details"]["hint"])
 
     def test_compact_match_keeps_every_unpinned_mtf_condition_visible(self) -> None:
@@ -523,10 +519,11 @@ class SamplingGridCli(CliTestCase):
 
 
 class SamplingGridUnit(unittest.TestCase):
-    def test_fixture_preference_cannot_rank_a_sampled_value(self) -> None:
+    def test_fixture_preference_resolves_a_sampled_value_with_its_grid(self) -> None:
         view = {"cost_proxy": {"count": 1, "sampled_field_fractions": [0, 1]}}
         preference = {"scope": ["cost_proxy"], "metric": "count", "direction": "ascending"}
-        self.assertEqual(ev.preference_value(view, preference, ev.EvalContext())[1], "SAMPLING_UNSPECIFIED")
+        value, reason, info = ev.preference_value(view, preference, ev.EvalContext())
+        self.assertEqual((value, reason, info["sampled_field_fractions"]), (1, None, [0, 1]))
 
     def test_missing_grid_differs_and_says_absent(self) -> None:
         view = {"performance": [{"metric": "m", "value": 1}]}
@@ -572,11 +569,13 @@ class EvidenceScopeCli(CliTestCase):
                 entries = []
                 for cid, own, note in (("Wide", wide, "wide_note"), ("Tele", tele, "tele_note")):
                     performance = [
-                        {"metric": "mtf", "value": 0.5, "source": {**own, "section": "mtf"}},
-                        {"metric": "note", "value": 1, "source": {**shared, "section": note}},
+                        {"metric": "mtf", "value": 0.5, "basis": "ENGINE_COMPUTED",
+                         "source": {**own, "section": "mtf"}},
+                        {"metric": "note", "value": 1, "basis": "ENGINE_COMPUTED",
+                         "source": {**shared, "section": note}},
                     ]
                     if extract_claimed_by_tele and cid == "Tele":
-                        performance.append({"metric": "extra", "value": 1,
+                        performance.append({"metric": "extra", "value": 1, "basis": "ENGINE_COMPUTED",
                                             "source": {**extract, "section": "summary"}})
                     entries.append({"configuration_id": cid, "conjugate": "INFINITE_TO_FINITE",
                                     "first_order": copy.deepcopy(first_order), "aperture": copy.deepcopy(aperture),

@@ -17,10 +17,11 @@ from importlib import resources
 
 __all__ = ["READER_SOURCES", "INDEX_SOURCES", "fingerprint", "reader_fingerprint", "index_fingerprint"]
 
-READER_SOURCES = ("canonical.py", "evaluate.py", "normalize.py", "output.py", "query.py", "store.py",
-                  "vocabulary.json", "vocabulary.py")
+READER_SOURCES = ("canonical.py", "evaluate.py", "normalize.py", "output.py", "project_facts.py",
+                  "query.py", "store.py", "vocabulary.json", "vocabulary.py")
 """The modules and data that decide query results and their order."""
-INDEX_SOURCES = ("build.py", "canonical.py", "corpus.py", "normalize.py", "vocabulary.json", "vocabulary.py")
+INDEX_SOURCES = ("build.py", "canonical.py", "corpus.py", "normalize.py", "project_facts.py", "vocabulary.json",
+                 "vocabulary.py")
 """The modules and data that produce an index."""
 
 

@@ -88,11 +88,7 @@
       "level": "configuration",
       "controlled": false,
       "description": "Condition-specific evidence present in the configuration: each performance metric and each analysis study (<study>_study)."
-    },
-    "validation": {
-      "level": "record",
-      "controlled": true,
-      "description": "Validation outcomes: paraxial_matched (validation.paraxial MATCHED), field_verified (validation.field MATCHED), project_accepted (validation.project_check ACCEPTED)."
+
     }
   },
   "terms": {
@@ -160,8 +156,7 @@
     "module_role": ["front_camera", "main_camera", "telephoto", "ultrawide"],
     "conjugate": ["finite_to_finite", "finite_to_infinite", "infinite_to_finite", "infinite_to_infinite"],
     "field_kind": ["angular", "image_height", "object_height"],
-    "stop_state": ["no_stop", "stop_blocking", "stop_not_blocking"],
-    "validation": ["field_verified", "paraxial_matched", "project_accepted"]
+    "stop_state": ["no_stop", "stop_blocking", "stop_not_blocking"]
   },
   "aliases": {
     "application": {

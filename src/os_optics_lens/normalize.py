@@ -4,12 +4,10 @@ A *configuration view* is the JSON that constraint evaluation reads for one (rec
 unit. Typed facts and configuration-level facets are derived from the same view, so the facts table
 can never disagree with constraint evaluation.
 
-Configuration view (record_schema_version 1.1, spec §2.3 and amendment 10.5): a deep copy of the
-record without its top-level `configurations`; every section given in the configuration entry
-replaces the top-level section (`conjugate` replaces `design.conjugate`); `view["configuration"]`
-holds `{"configuration_id", "label", "native"}`. A record without `configurations` has one view: the
-Project as written, which takes the native id when the Project declares exactly one configuration and
-otherwise has `configuration_id` null (configuration_key '').
+Configuration resolution for record schema 1.1 applies whole-section overrides before the corpus
+loader projects the result onto Project facts. `conjugate` replaces `design.conjugate`. The
+`configuration` member holds the native id, label and native flag. Without record overrides, one
+view represents the Project as written, taking the native id if the Project declares exactly one.
 """
 
 from __future__ import annotations
@@ -43,7 +41,7 @@ UNIT_SUFFIXES = (("_lp_mm", "lp/mm"), ("_percent", "percent"), ("_deg", "deg"), 
 DIMENSIONLESS_ENDINGS = ("f_number", "numerical_aperture", "_count", "_fraction", "_weight")
 FROM_SUFFIX = re.compile(r"_from_[a-z0-9]+$")
 VALUE_FIELD = re.compile(r"value(_[a-z_]+)?")
-BASIS_CLASSES = ("SOURCE_STATED", "DERIVED", "ENGINE_COMPUTED")
+BASIS_CLASSES = ("PROJECT_DECLARED", "PROJECT_DERIVED", "DERIVED", "ENGINE_COMPUTED")
 PERFORMANCE_NON_QUALIFIERS = frozenset({
     "metric", "basis", "engine_version", "source", "condition", "conditions", "definition",
     "limiting_sample", "sampled_field_fractions",
@@ -218,10 +216,9 @@ def check_configurations(record: dict[str, Any], natives: list[NativeConfigurati
 
 
 def configuration_views(record: dict[str, Any], project: Any) -> list[ConfigView]:
-    """The configuration views of a record, in ordinal order.
+    """Resolve each configuration's metadata in ordinal order, before Project fact projection.
 
-    `project` is the parsed native Project (or None). The view is exactly what constraint evaluation
-    reads. Assumes `check_configurations` found no error; malformed entries are skipped.
+    `project` is the parsed native Project (or None). Malformed entries are skipped.
     """
     natives, _ = native_configurations(project)
     native_labels = {n.configuration_id: n.label for n in natives}
@@ -632,7 +629,7 @@ def _str_list(value: Any) -> list[str]:
 
 def record_facets(record: dict[str, Any], vocabulary: Vocabulary | None = None) -> tuple[list[FacetValue], list[Issue]]:
     """Record-level facets (collection, family, design_scope, design_type, source_lens_type, function,
-    application, structure, module_role, stop_state, validation) and UNKNOWN_TERM warnings."""
+    application, structure, module_role, stop_state) and UNKNOWN_TERM warnings."""
     vocab = vocabulary or load_vocabulary()
     values: set[FacetValue] = set()
     issues: list[Issue] = []
@@ -693,13 +690,6 @@ def record_facets(record: dict[str, Any], vocabulary: Vocabulary | None = None) 
         state = _lower(validity.get("state"))
         if state:
             values.add(FacetValue("stop_state", state, RECORD_BASIS))
-    validation = record.get("validation") if isinstance(record.get("validation"), dict) else {}
-    if validation.get("paraxial") == "MATCHED":
-        values.add(FacetValue("validation", "paraxial_matched", RECORD_BASIS))
-    if validation.get("field") == "MATCHED":
-        values.add(FacetValue("validation", "field_verified", RECORD_BASIS))
-    if validation.get("project_check") == "ACCEPTED":
-        values.add(FacetValue("validation", "project_accepted", RECORD_BASIS))
     return sorted(values), issues
 
 

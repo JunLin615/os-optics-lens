@@ -13,7 +13,7 @@ shortened and `details.truncated` is true when anything was cut.
 | `UNKNOWN_FACET` | 2 | no such facet | `os-optics-lens facets` lists them |
 | `UNKNOWN_FACET_VALUE` | 2 | value is neither a vocabulary term nor present in the index | use `details.did_you_mean` |
 | `AMBIGUOUS_TERM` | 2 | an alias maps to several terms (e.g. `objective`) | pick one of `details.candidates` |
-| `UNKNOWN_FIELD` | 2 | fact key not in the index (ranges, targets, preferences, `fields --fact`, compare/inspect fields), or a name of a provenance check (`details.provenance_check`), which cannot be matched or ranked | `os-optics-lens fields`; see `did_you_mean`; read a check with `inspect --fields` |
+| `UNKNOWN_FIELD` | 2 | fact key not in the index (ranges, targets, preferences, `fields --fact`, compare/inspect fields), or a name of a provenance check (`details.provenance_check`), which cannot be matched or ranked | `os-optics-lens fields`; see `did_you_mean`; use `inspect ID --provenance` for direct-source information |
 | `UNSUPPORTED_OPERATOR` | 2 | unknown `op` | pick one of `details.supported` |
 | `CURSOR_INVALID` | 2 | the cursor is not a cursor, or a version 1 cursor | pass `next_cursor` exactly; for an old cursor restart without it |
 | `CURSOR_MISMATCH` | 2 | the cursor belongs to another query | resend the same query with it |

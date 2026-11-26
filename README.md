@@ -1,6 +1,6 @@
 # os-optics-lens
 
-A planned library of optical prescriptions for AI agents. An agent uses an optical design brief to find candidate prescriptions, inspects a few relevant properties or structural details, and retrieves a native Project to continue design in `os-optics`.
+A searchable library of optical prescriptions for AI agents. Start with an optical design brief, inspect relevant facts and structural details, and retrieve an editable native Project to continue design in `os-optics`.
 
 ## Project rules
 
@@ -8,7 +8,7 @@ A planned library of optical prescriptions for AI agents. An agent uses an optic
 - Keep the corpus focused on Projects, compact search metadata and any small supporting data needed to interpret a Project fact. Keep preparation material in the contribution workspace or PR. Record the contributor's direct source and attribution, available through explicit provenance inspection.
 - Keep a specification match and a promising optimization starting point distinguishable in search results. Show a missing value when it matters to the query.
 
-`os-optics` owns the native model and optical evaluation. `os-optics-lens` will own the prescription collection and its installed retrieval interface. `os-optics-kit` provides agent skills, study tools and worked cases. [Engine](https://github.com/JunLin615/os-optics) · [Kit](https://github.com/JunLin615/os-optics-kit)
+`os-optics` owns the native model and optical evaluation. `os-optics-lens` ships the prescription collection and its retrieval interface. `os-optics-kit` provides agent skills, study tools and worked cases. [Engine](https://github.com/JunLin615/os-optics) · [Kit](https://github.com/JunLin615/os-optics-kit)
 
 ## The seed collection
 
@@ -83,9 +83,12 @@ os-optics-lens project yutong-2025-mirrorless-18-p2b --out work/p2b.project.json
   `UNCONFIRMED`, with a reason code for each unknown.
 - **Starting-point search** (`--mode starting_point --target FACT=VALUE~TOL`) ranks near matches
   and lists their shortfalls and unknowns.
-- `compare` and `inspect` load details on demand.
+- `compare` compares selected Project facts. `inspect` shows Project facts, configurations and
+  prescription details. Use `inspect ID --evidence SECTION` to read supporting analysis.
 - `project --out` writes the exact native Project bytes. Their SHA-256 equals the record's
   `native_project.sha256`.
+- Use `inspect ID --provenance` when you need the record's direct source, attribution or
+  redistribution terms.
 
 On Windows PowerShell, pass JSON requests with `--request FILE`. Outside an installed wheel,
 build an index from a checkout with `os-optics-lens index build --corpus . --out

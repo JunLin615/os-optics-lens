@@ -164,7 +164,7 @@ class EvidenceIntegrityCli(CliCase):
                 self.assertIn("damaged", doc["error"]["details"]["tried"][0]["problem"])
                 self.assertNotIn(MARKER.encode(), raw)
 
-    def test_default_inspect_and_fact_sources_show_the_live_status(self) -> None:
+    def test_supporting_evidence_listing_shows_the_live_status(self) -> None:
         code, doc, raw = run_cli("inspect", P2B, "--fields", "performance.mtf_field_minimum", index=self.damaged)
         self.assertEqual(code, 0, doc)
         self.assertNotIn(MARKER.encode(), raw)
@@ -173,7 +173,9 @@ class EvidenceIntegrityCli(CliCase):
         self.assertEqual(statuses, {"HASH_MISMATCH"})
         self.assertEqual(result["evidence"]["files"][P2B_EVIDENCE]["status"], "HASH_MISMATCH")
         self.assertNotIn(P2B_EVIDENCE, result["evidence"]["sections"])
-        self.assertEqual(result["fields"]["performance.mtf_field_minimum"]["source"]["status"], "HASH_MISMATCH")
+        fact = result["fields"]["performance.mtf_field_minimum"]
+        self.assertNotIn("source", fact)
+        self.assertNotIn("source", fact["value"])
         intact = self.ok("inspect", P2B, index=INDEX)["result"]["evidence"]
         self.assertEqual({r["status"] for r in intact["refs"]}, {"RESOLVED"})
         self.assertNotIn("status", intact["files"][P2B_EVIDENCE])
@@ -598,10 +600,11 @@ class SemanticsBindingUnit(unittest.TestCase):
 
     def test_fingerprint_sources(self) -> None:
         self.assertEqual(set(semantics.READER_SOURCES), {
-            "evaluate.py", "query.py", "output.py", "canonical.py", "normalize.py", "store.py", "vocabulary.py",
-            "vocabulary.json"})
+            "evaluate.py", "query.py", "output.py", "canonical.py", "normalize.py", "project_facts.py", "store.py",
+            "vocabulary.py", "vocabulary.json"})
         self.assertEqual(set(semantics.INDEX_SOURCES), {
-            "corpus.py", "normalize.py", "build.py", "canonical.py", "vocabulary.py", "vocabulary.json"})
+            "corpus.py", "normalize.py", "project_facts.py", "build.py", "canonical.py", "vocabulary.py",
+            "vocabulary.json"})
 
     def test_an_index_without_the_fingerprint_is_refused(self) -> None:
         path = tampered("no-semantics", "DELETE FROM meta WHERE key=?", ("index_semantics",))
@@ -865,7 +868,8 @@ class SourceMemberCli(IntakeCase):
 class FractionOfUnitCli(IntakeCase):
     def test_a_fraction_of_something_is_dimensionless(self) -> None:
         name = "field_fraction_of_stated_half_field"
-        self.corpus.add("rec-a", mutate=lambda record: record.__setitem__("image_format", {name: 0.8}))
+        self.corpus.add("rec-a", mutate=lambda record: record.__setitem__(
+            "image_format", {name: {"value": 0.8, "basis": "ENGINE_COMPUTED"}}))
         doc = self.ok("index", "validate", "--corpus", str(self.root))
         self.assertNotIn("UNIT_UNKNOWN", {f["code"] for f in doc["result"]["findings"]})
         out = self.work / "index.sqlite"

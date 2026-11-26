@@ -75,9 +75,12 @@ os-optics-lens inspect yutong-2025-mirrorless-18-p2b
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b --fields performance.mtf_field_minimum
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b --evidence all --max-output-bytes 65536
 os-optics-lens inspect lenslibrary-528155 --prescription summary
+os-optics-lens inspect lenslibrary-528155 --provenance
 ```
 
-The default output lists fact keys and evidence sections without bulk data.
+Ordinary inspection shows Project identity, configuration, available fact keys and supporting
+evidence section names. Use `--evidence SECTION` to read an analysis or `--provenance` to read
+the record's direct source, attribution and redistribution terms.
 
 ## 6. Hand off the native Project
 

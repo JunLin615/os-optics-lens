@@ -20,7 +20,7 @@ from pathlib import Path
 
 from os_optics_lens import query
 from os_optics_lens.build import build_index
-from os_optics_lens.canonical import lf, record_hash
+from os_optics_lens.canonical import lf, record_hash, sha256_hex
 from os_optics_lens.errors import LensError
 from os_optics_lens.store import open_index
 
@@ -244,6 +244,16 @@ class Counterexamples(unittest.TestCase):
 
     def build_and_search(self, record: dict, name: str, constraint: dict, *,
                          allow_unresolved_evidence: bool = False) -> dict:
+        project_path = record["native_project"]["path"]
+        native_bytes = lf((ROOT / project_path).read_bytes())
+        if name == "a_nonblocking_stop_cannot_confirm_a_pupil_based_match":
+            project = json.loads(native_bytes)
+            stop = next(item["model"] for item in project["optical_models"]
+                        if item["model"]["model_kind"] == "APERTURE_STOP")
+            stop["edge_radius_mm"] = stop["opening_radius_mm"]
+            native_bytes = json.dumps(project).encode()
+            record["native_project"]["sha256"] = sha256_hex(native_bytes)
+        (self.corpus.root / project_path).write_bytes(native_bytes)
         self.corpus.write_p2b(rehash(record))
         out = self.corpus.out_dir / f"{name}.sqlite"
         build_index(self.corpus.root, out, allow_unresolved_evidence=allow_unresolved_evidence)
@@ -258,10 +268,16 @@ class Counterexamples(unittest.TestCase):
         self.assertEqual({case["id"] for case in CASE["counterexamples"]}, set(EXPECTED_REASONS))
         for case in CASE["counterexamples"]:
             with self.subTest(case=case["id"]):
-                constraint = CONSTRAINTS[case["constraint"]]
+                constraint = copy.deepcopy(CONSTRAINTS[case["constraint"]])
                 record = mutate(P2B_RECORD, case)
                 expected = case["expected"]
                 self.assertEqual(reference.evaluate(record, constraint), expected)
+                # Use the actual focal-point fact to exercise the incompatible endpoints, and set
+                # a tight limit around the actual Project sensor distance to exercise shortfalls.
+                if case["id"] == "rear_focal_point_cannot_replace_sensor_distance":
+                    constraint["scope"] = case["copy_from"]
+                if case["id"] == "comparable_back_focus_below_limit":
+                    constraint["predicates"][0]["value"] = 17.062748732264
                 candidate = self.build_and_search(record, case["id"], constraint,
                                                   allow_unresolved_evidence=case["id"] == UNRESOLVABLE)
                 self.assertEqual(candidate["outcome"], expected)
@@ -309,15 +325,18 @@ class Counterexamples(unittest.TestCase):
         record["spectrum"]["sampling_wavelengths_nm"].reverse()
         self.assertEqual(reference.evaluate(record, CONSTRAINTS["spectral_sampling"]), "DOES_NOT_MATCH")
         candidate = self.build_and_search(record, "reversed", CONSTRAINTS["spectral_sampling"])
+        self.assertEqual(candidate["outcome"], "MATCH")  # Retrieval reads the native source samples.
+        reversed_request = copy.deepcopy(CONSTRAINTS["spectral_sampling"])
+        reversed_request["predicates"][0]["value"].reverse()
+        candidate = self.build_and_search(record, "reversed-request", reversed_request)
         self.assertEqual(candidate["outcome"], "DOES_NOT_MATCH")
 
 
 class Parity(unittest.TestCase):
-    """Section 9.3: production outcome == reference outcome for every record x fixture constraint,
-    except the documented stop-gate downgrades (amendment 10.1)."""
+    """Compare production and the independent evaluator on each indexed Project fact view."""
 
     def test_every_record_and_constraint(self) -> None:
-        records = {path.parent.name: load_json(path) for path in sorted((ROOT / "records").glob("*/*/record.json"))}
+        records = {config["record_id"]: config["view"] for config in INDEX.iter_configurations()}
         self.assertGreaterEqual(len(records), 41)
         exceptions = 0
         for record_id, record in records.items():

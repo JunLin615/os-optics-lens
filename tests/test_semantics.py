@@ -53,18 +53,18 @@ def evaluate(record_id: str, constraint: dict, detail: str = "full") -> tuple[di
 
 
 class StopGates(unittest.TestCase):
-    def test_eligible_but_not_satisfying(self) -> None:
-        entry, _ = evaluate("lenslibrary-1792917", {"fact": "aperture.working_f_number", "op": "lte", "value": 5})
-        self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "STOP_MATCH_NOT_SUPPORTED"))
-        entry, candidate = evaluate("lenslibrary-1792917",
-                                    {"fact": "aperture.working_f_number", "op": "lte", "value": 4})
-        self.assertEqual(entry["outcome"], "DOES_NOT_MATCH")
-        self.assertAlmostEqual(candidate["shortfalls"][0]["shortfall"], 0.511507, places=9)
+    def test_source_f_number_is_unconfirmed_despite_blocking_stop(self) -> None:
+        for limit in (4, 5):
+            entry, candidate = evaluate("lenslibrary-1792917", {
+                "fact": "aperture.working_f_number", "op": "lte", "value": limit,
+            })
+            self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "FACT_MISSING"))
+            self.assertEqual(candidate["shortfalls"], [])
 
     def test_paraxial_working_convention(self) -> None:
         entry, _ = evaluate("lenslibrary-6744570a",
                             {"fact": "aperture.paraxial_working_f_number", "op": "lte", "value": 4})
-        self.assertEqual(entry["reason"], "STOP_MATCH_NOT_SUPPORTED")
+        self.assertEqual(entry["reason"], "FACT_MISSING")
         entry, _ = evaluate("lenslibrary-6744570a", {"fact": "aperture.f_number", "op": "lte", "value": 5})
         self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "FACT_MISSING"))
 
@@ -149,27 +149,17 @@ class PathGuards(unittest.TestCase):
                 self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "COMPARISON_ONLY"))
                 self.assertEqual(candidate["outcome"], "UNCONFIRMED")
         real, _ = evaluate("lenslibrary-6016226", {"fact": "field.half_field_deg", "op": "lte", "value": 2})
-        self.assertEqual(real["outcome"], "DOES_NOT_MATCH")
+        self.assertEqual((real["outcome"], real["reason"]), ("UNCONFIRMED", "FACT_MISSING"))
 
-    def test_whole_section_predicate_is_gated(self) -> None:
-        # 7821720c: stop_blocks_light false, eligible_for_stop_dependent_evaluation false.
-        record = json.loads(next((ROOT / "records").glob("*/lenslibrary-7821720c/record.json"))
-                            .read_text(encoding="utf-8"))
-        forms = (
-            {"scope": ["aperture"], "predicates": [{"path": "", "op": "ne", "value": {}}]},
-            {"fact": "aperture", "path": "", "op": "ne", "value": {}},
-            {"scope": ["aperture"], "predicates": [{"path": "", "op": "eq", "value": record["aperture"]}]},
-            {"scope": ["aperture"], "predicates": [
-                {"path": "", "op": "eq", "value": dict(record["aperture"], working_f_number=99)}]},
-        )
-        for constraint in forms:
-            with self.subTest(constraint=constraint):
-                entry, _ = evaluate("lenslibrary-7821720c", constraint)
-                self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "STOP_NOT_ELIGIBLE"))
-        # On an eligible stop the whole object still holds a comparison-only check.
-        entry, _ = evaluate("lenslibrary-1792917", {"scope": ["aperture"], "predicates": [
-            {"path": "", "op": "ne", "value": {}}]})
-        self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "COMPARISON_ONLY"))
+    def test_whole_sections_compare_project_members_and_keep_guards(self) -> None:
+        record_id = "lenslibrary-7821720c"
+        projected = query.inspect(INDEX, record_id, sections=["aperture"])["result"]["sections"]["aperture"]
+        original = json.loads((ROOT / "records/lenslibrary" / record_id / "record.json").read_bytes())["aperture"]
+        self.assertEqual(set(projected), {"stop_opening_diameter_mm"})
+        for value, outcome in ((projected, "MATCH"), (original, "DOES_NOT_MATCH")):
+            entry, _ = evaluate(record_id, {"scope": ["aperture"], "predicates": [
+                {"path": "", "op": "eq", "value": value}]})
+            self.assertEqual(entry["outcome"], outcome)
         # A whole spectrum object contains the discovery-only sampling span.
         entry, _ = evaluate(P2B, {"scope": ["spectrum"], "predicates": [{"path": "", "op": "ne", "value": {}}]})
         self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "DISCOVERY_ONLY"))
@@ -229,7 +219,7 @@ class Shorthand(unittest.TestCase):
         select = {"frequency_lp_mm": 10, "image_height_mm": 0, "direction": "tangential"}
         entry, _ = evaluate(SONNAR, {"fact": "performance.mtf", "op": "gt", "value": 0.9, "select": select})
         self.assertEqual(entry["outcome"], "MATCH")
-        self.assertEqual(entry["fact"]["source"]["status"], "RESOLVED")
+        self.assertNotIn("source", entry["fact"])
         entry, _ = evaluate(SONNAR, {"fact": "performance.mtf", "op": "gt", "value": 0.9})
         self.assertEqual(entry["reason"], "AMBIGUOUS_FACTS")
 

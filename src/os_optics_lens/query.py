@@ -10,8 +10,8 @@ accounted for by `output`):
 * `search` / `run_request` - specification and starting-point search, single or batch, with
   deterministic ordering, budgeted pages and continuation cursors.
 * `compare` - a short list of records/configurations side by side, flagging incomparable rows.
-* `inspect` - one record: identity, provenance, configurations and the fact keys and evidence
-  sections available, plus selected facts, sections, evidence and prescription on request.
+* `inspect` - one record's identity, configurations, available facts and supporting calculations,
+  with selected facts, evidence, prescription and direct provenance on request.
 * `project_metadata` / `project_bytes` - the native Project hand-off (the CLI performs file I/O).
 
 Every public entry point raises `errors.LensError` with the codes of spec §7. Constraint semantics
@@ -33,9 +33,10 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator, Sequence
 
 from . import output
-from .canonical import corpus_relative_path
+from .canonical import canonical_key, corpus_relative_path
 from .errors import LensError
 from .evaluate import (
+    CONDITIONS_DIFFER,
     DOES_NOT_MATCH,
     MATCH,
     OUTCOMES,
@@ -50,15 +51,19 @@ from .evaluate import (
     fact_present,
     is_fixture_preference,
     is_shorthand,
+    json_equal,
     preference_rank_entry,
     preference_value,
+    public_fact_value,
+    ranking_conditions_equal,
     target_deviation,
     target_value,
     validate_preferences,
     validate_target,
 )
 from .normalize import iter_source_refs
-from .store import Index
+from .project_facts import analysis_applies
+from .store import NOTICE_FIELD, Index
 from .vocabulary import Vocabulary, load_vocabulary
 
 __all__ = [
@@ -108,14 +113,15 @@ _EXCLUDED_STAGES = ("filters", "missing_fact", "out_of_range")
 _VALUE_MEMBER = re.compile(r"^value(_[a-z_]+)?$")
 _INDEX_SEGMENT = re.compile(r"^([^\[\]]+)((?:\[\d+\])*)$")
 _ENTRY_REF_FIELD = re.compile(r"^configurations\[(\d+)\]\.")
-# Checks that compare a whole section's source table: shown with every fact of the section.
-_SECTION_WIDE_CHECKS = frozenset({"prescription_dump_check"})
 _LICENSE_PATH = re.compile(r"\b(licenses/[A-Za-z0-9._-]+|LICENSE)\b")
+_PROVENANCE_MEMBERS = ("source", "source_url", "source_revision", "source_input", "source_input_sha256",
+                       "source_links", "original_publication", "contributor", "attribution")
 
 _FIELD_CANDIDATES = ("field.half_field_deg", "field.max_image_height_mm", "field.max_object_height_mm")
 _DEFAULT_LEADING = ("first_order.effective_focal_length_mm",)
 _DEFAULT_TRAILING = ("image_format.image_circle_diameter_mm", "first_order.total_track_mm",
                      "spectrum.sampling_span_nm")
+_PARAXIAL_LENGTHS = frozenset({"first_order.effective_focal_length_mm", "first_order.back_focal_length_mm"})
 
 _OPS_BY_TYPE = {
     "number": ["eq", "ne", "gt", "gte", "lt", "lte", "between_inclusive", "in"],
@@ -302,8 +308,8 @@ class _Session:
             return
         raise LensError(
             "UNKNOWN_FIELD", f"{_short_text(key)!r} names {member}, a provenance check, not a fact",
-            hint=f"{member} is a provenance check that cannot be matched or ranked; read it under `checks` "
-                 "with `os-optics-lens inspect <record_id> --fields <fact_key>` (or in `--sections`).",
+            hint=f"{member} is a provenance check that cannot be matched or ranked. "
+                 "Use `os-optics-lens inspect <record_id> --provenance` for the direct source and terms.",
             details={"pointer": pointer, "fact": _short_text(key), "provenance_check": member,
                      "did_you_mean": []})
 
@@ -669,7 +675,7 @@ def _normalize_query(s: _Session, raw: Any, base: str, warnings: list[dict[str, 
     for i, item in enumerate(targets_raw):
         with _request_errors():
             validate_target(item, _ptr(tptr, i))
-        s.require_fact(item["fact"], _ptr(tptr, i, "fact"))
+        s.reject_check(item["fact"], _ptr(tptr, i, "fact"))
         s.reject_check(item.get("path"), _ptr(tptr, i, "path"))
         _reject_interval(s, item, _ptr(tptr, i), "target", allow_cover=False)
         target = copy.deepcopy(item)
@@ -687,7 +693,7 @@ def _normalize_query(s: _Session, raw: Any, base: str, warnings: list[dict[str, 
     preferences = []
     for i, item in enumerate(preferences_raw):
         key = ".".join(list(item["scope"]) + [item["metric"]]) if is_fixture_preference(item) else item["fact"]
-        s.require_fact(key, _ptr(pptr, i, "metric" if is_fixture_preference(item) else "fact"))
+        s.reject_check(key, _ptr(pptr, i, "metric" if is_fixture_preference(item) else "fact"))
         if not is_fixture_preference(item):
             s.reject_check(item.get("path"), _ptr(pptr, i, "path"))
             _reject_interval(s, item, _ptr(pptr, i), "preference", allow_cover=False)
@@ -761,6 +767,9 @@ def _reject_interval(s: _Session, item: dict[str, Any], pointer: str, what: str,
         return
     if allow_cover and item.get("op") == "covers_interval":
         return
+    if not allow_cover and "required_sampled_field_fractions" in item and item["fact"].startswith("performance."):
+        # The selected grid may resolve to a numeric entry even when another entry is an interval.
+        return
     pair = _interval_paths(s, item["fact"])
     if pair is not None:
         raise _invalid(f"{item['fact']} is an interval ({pair[0]}/{pair[1]}); a {what} needs one bound",
@@ -785,6 +794,7 @@ def _row_value(row: dict[str, Any]) -> Any:
     if row["value_json"] is None:
         return None
     value = json.loads(row["value_json"])
+    value = public_fact_value(value)
     if isinstance(value, dict):
         return {"state": row["state"]} if row["state"] is not None else {"members": sorted(value)[:8]}
     return value
@@ -798,6 +808,10 @@ def _summary_entry(rows: list[dict[str, Any]], full_basis: bool) -> dict[str, An
                                  "basis": row["basis"] if full_basis else row["basis_class"]}
         if row["value_json"] is None and row["value_paths"]:
             entry["value_paths"] = json.loads(row["value_paths"])
+        if row["fact_key"] in _PARAXIAL_LENGTHS and row["basis_class"] == "ENGINE_COMPUTED" and row["conditions_json"]:
+            wavelength = json.loads(row["conditions_json"]).get("wavelength_nm")
+            if _is_number(wavelength):
+                entry["conditions"] = {"wavelength_nm": wavelength}
         if full_basis:
             for name in ("eligible_for", "state"):
                 if row[name] is not None:
@@ -878,9 +892,9 @@ class _ConfigResult:
     evaluation: dict[str, Any]
     targets: list[dict[str, Any]]
     preferences: list[dict[str, Any]]
-    rank_key: list[Any]
-    sort_key: tuple[Any, ...]
-    choice_key: tuple[Any, ...]
+    rank_key: list[Any] = field(init=False)
+    sort_key: tuple[Any, ...] = field(init=False)
+    choice_key: tuple[Any, ...] = field(init=False)
     """Chooses the record's best configuration (§6.4); `sort_key` then orders the records."""
 
 
@@ -888,75 +902,126 @@ def _pref_sort(entry: list[Any]) -> tuple[int, float]:
     return (1, 0.0) if entry[0] else (0, float(entry[1]))
 
 
-def _evaluate_targets(s: _Session, view: dict[str, Any], q: dict[str, Any], base: str) -> list[dict[str, Any]]:
+def _ranking_comparison(s: _Session, config: dict[str, Any], info: dict[str, Any]) -> dict[str, Any]:
+    """Comparison metadata for the resolved value, including the indexed performance qualifiers."""
+    comparison = {key: info.get(key) for key in ("sampled_field_fractions", "conditions", "unit", "value_member")}
+    comparison["qualifiers"] = None
+    entry_path = info["json_path"].split(".", 1)[0]
+    if entry_path.startswith("performance["):
+        fact = ".".join(info["fact"].split(".")[:2])
+        rows = s.config_facts(config["config_pk"]).get(fact, ())
+        comparison["qualifiers"] = next(
+            (row["qualifiers_json"] for row in rows if row["json_path"].split(".", 1)[0] == entry_path), None)
+    return comparison
+
+
+def _evaluate_targets(s: _Session, config: dict[str, Any], view: dict[str, Any], q: dict[str, Any],
+                      base: str) -> list[dict[str, Any]]:
     out = []
     for i, target in enumerate(q["targets"]):
-        pointer = _ptr(base, "targets", i)
         with _request_errors():
-            value, reason, info = target_value(view, target, s.ctx, pointer=pointer)
-            item: dict[str, Any] = {"id": target["id"], "fact": target["fact"], "weight": target["weight"]}
-            if value is None:
-                item["reason"] = reason
-                if info.get("details"):
-                    item["details"] = info["details"]
-            else:
-                item.update(target_deviation(value, target, pointer=pointer))
-                item["unit"] = info.get("unit")
-                item["json_path"] = info.get("json_path")
-        out.append(item)
-    return out
-
-
-def _evaluate_preferences(s: _Session, view: dict[str, Any], q: dict[str, Any], base: str) -> list[dict[str, Any]]:
-    out = []
-    for i, preference in enumerate(q["preferences"]):
-        with _request_errors():
-            value, reason, info = preference_value(view, preference, s.ctx, pointer=_ptr(base, "preferences", i))
-        fact = info.get("fact") or preference.get("fact")
-        item: dict[str, Any] = {"id": preference["id"], "fact": fact, "direction": preference["direction"],
-                                "value": value, "entry": preference_rank_entry(value, preference["direction"])}
+            value, reason, info = target_value(view, target, s.ctx, pointer=_ptr(base, "targets", i))
+        item: dict[str, Any] = {"id": target["id"], "fact": target["fact"], "weight": target["weight"],
+                                "value": value}
         if value is None:
             item["reason"] = reason
             if info.get("details"):
                 item["details"] = info["details"]
         else:
             item["unit"] = info.get("unit")
+            item["comparison"] = _ranking_comparison(s, config, info)
         out.append(item)
     return out
 
 
-def _evaluate_config(s: _Session, config: dict[str, Any], record: dict[str, Any], q: dict[str, Any],
-                     base: str) -> _ConfigResult:
+def _evaluate_preferences(s: _Session, config: dict[str, Any], view: dict[str, Any], q: dict[str, Any],
+                          base: str) -> list[dict[str, Any]]:
+    out = []
+    for i, preference in enumerate(q["preferences"]):
+        with _request_errors():
+            value, reason, info = preference_value(view, preference, s.ctx, pointer=_ptr(base, "preferences", i))
+        fact = info.get("fact") or preference.get("fact")
+        item: dict[str, Any] = {"id": preference["id"], "fact": fact, "direction": preference["direction"],
+                                "value": value}
+        if value is None:
+            item["reason"] = reason
+            if info.get("details"):
+                item["details"] = info["details"]
+        else:
+            item["comparison"] = _ranking_comparison(s, config, info)
+        out.append(item)
+    return out
+
+
+def _evaluate_config(s: _Session, config: dict[str, Any], q: dict[str, Any], base: str) -> _ConfigResult:
     view = s.view(config)
     with _request_errors():
         evaluation = evaluate_configuration(view, q["constraints"], s.ctx, detail=True)
-    targets = _evaluate_targets(s, view, q, base)
-    preferences = _evaluate_preferences(s, view, q, base)
-    entries = [p["entry"] for p in preferences]
-    counts = evaluation["counts"]
-    ordinal = config["ordinal"]
-    record_id = record["record_id"]
+    targets = _evaluate_targets(s, config, view, q, base)
+    preferences = _evaluate_preferences(s, config, view, q, base)
+    return _ConfigResult(config, evaluation, targets, preferences)
+
+
+def _hard_rank(result: _ConfigResult, mode: str) -> tuple[int, ...]:
+    if mode == SPECIFICATION:
+        # Choose the record's best configuration by outcome and hard-constraint counts before preferences.
+        return configuration_rank(result.evaluation, result.config["ordinal"])[:-1]
+    counts = result.evaluation["counts"]
+    return counts[DOES_NOT_MATCH], counts[UNCONFIRMED]
+
+
+def _sampled_ranking_unknowns(results: Sequence[_ConfigResult]) -> None:
+    """Keep each sampled ranking term only when its available values can be compared."""
+    for terms in zip(*(result.targets + result.preferences for result in results)):
+        known = [term for term in terms if "comparison" in term]
+        if not any(term["comparison"]["sampled_field_fractions"] is not None for term in known):
+            continue
+        first = known[0]["comparison"]
+        differs = []
+        for key, value in first.items():
+            equal = ranking_conditions_equal if key == "conditions" else json_equal
+            if any(not equal(value, term["comparison"][key]) for term in known[1:]):
+                differs.append(key)
+        if not differs:
+            continue
+        grids_differ = "sampled_field_fractions" in differs
+        hint = ("pin required_sampled_field_fractions in the target or shorthand preference" if grids_differ
+                else "narrow candidates to matching conditions, qualifiers and units")
+        for term in known:
+            comparison = term["comparison"]
+            details = {"actual": comparison["sampled_field_fractions"], "differs_by": differs, "hint": hint}
+            for key in differs:
+                if key == "sampled_field_fractions":
+                    continue
+                value = comparison[key]
+                if key == "qualifiers" and value is not None:
+                    value = json.loads(value)
+                details[key] = public_fact_value(value)
+            term.update(value=None, reason=SAMPLING_UNSPECIFIED if grids_differ else CONDITIONS_DIFFER, details=details)
+
+
+def _rank_config(result: _ConfigResult, record_id: str, q: dict[str, Any], base: str) -> None:
+    ordinal = result.config["ordinal"]
+    entries = [preference_rank_entry(p["value"], p["direction"]) for p in result.preferences]
+    sorted_preferences = tuple(_pref_sort(entry) for entry in entries)
+    hard = _hard_rank(result, q["mode"])
     if q["mode"] == SPECIFICATION:
-        rank_key: list[Any] = [evaluation["outcome"], *entries, record_id, ordinal]
-        sort_key: tuple[Any, ...] = (OUTCOMES.index(evaluation["outcome"]),
-                                     *[_pref_sort(e) for e in entries], record_id, ordinal)
-        # §6.4: a record's best configuration is chosen by outcome, then more MATCH constraints,
-        # then fewer DOES_NOT_MATCH; preferences only break the remaining ties, then the ordinal.
-        outcome_rank, more_match, fewer_dnm, _ = configuration_rank(evaluation, ordinal)
-        choice_key: tuple[Any, ...] = (outcome_rank, more_match, fewer_dnm,
-                                       *[_pref_sort(e) for e in entries], ordinal)
-    else:
-        unknown_targets = sum(1 for t in targets if "reason" in t)
-        score = round(sum(t["weight"] * t["normalized"] for t in targets if "normalized" in t), 9)
-        if not math.isfinite(score):
-            raise _invalid("the weighted target score is not a finite number", _ptr(base, "targets"),
-                           "give smaller weights or larger tolerances")
-        rank_key = [counts[DOES_NOT_MATCH], counts[UNCONFIRMED], unknown_targets, score, *entries,
-                    record_id, ordinal]
-        sort_key = (counts[DOES_NOT_MATCH], counts[UNCONFIRMED], unknown_targets, score,
-                    *[_pref_sort(e) for e in entries], record_id, ordinal)
-        choice_key = sort_key
-    return _ConfigResult(config, evaluation, targets, preferences, rank_key, sort_key, choice_key)
+        result.rank_key = [result.evaluation["outcome"], *entries, record_id, ordinal]
+        result.sort_key = (hard[0], *sorted_preferences, record_id, ordinal)
+        result.choice_key = (*hard, *sorted_preferences, ordinal)
+        return
+    for i, (item, target) in enumerate(zip(result.targets, q["targets"])):
+        if item["value"] is not None:
+            with _request_errors():
+                item.update(target_deviation(item["value"], target, pointer=_ptr(base, "targets", i)))
+    unknown_targets = sum(1 for item in result.targets if "reason" in item)
+    score = round(sum(t["weight"] * t["normalized"] for t in result.targets if "normalized" in t), 9)
+    if not math.isfinite(score):
+        raise _invalid("the weighted target score is not a finite number", _ptr(base, "targets"),
+                       "give smaller weights or larger tolerances")
+    result.rank_key = [*hard, unknown_targets, score, *entries, record_id, ordinal]
+    result.sort_key = (*hard, unknown_targets, score, *sorted_preferences, record_id, ordinal)
+    result.choice_key = result.sort_key
 
 
 def _explanation(q: dict[str, Any], best: _ConfigResult) -> str:
@@ -966,7 +1031,10 @@ def _explanation(q: dict[str, Any], best: _ConfigResult) -> str:
     pref_parts = []
     for p in best.preferences:
         if p["value"] is None:
-            pref_parts.append(f"preference {p['fact']} unknown ({p['reason']}), ranked after comparable values")
+            message = f"preference {p['fact']} unknown ({p['reason']})"
+            if "differs_by" not in p.get("details", {}):
+                message += ", ranked after comparable values"
+            pref_parts.append(message)
         else:
             pref_parts.append(f"preference {p['fact']} = {p['value']} ({p['direction']})")
     if q["mode"] == SPECIFICATION:
@@ -1037,6 +1105,15 @@ def _shortfalls(q: dict[str, Any], best: _ConfigResult) -> list[dict[str, Any]]:
     return out
 
 
+def _ranking_unknown_details(item: dict[str, Any], with_details: bool) -> dict[str, Any] | None:
+    details = item.get("details")
+    if with_details or not details:
+        return details
+    if "differs_by" in details:
+        return {key: details[key] for key in ("actual", "differs_by", "hint")}
+    return None
+
+
 def _unknowns(best: _ConfigResult, with_details: bool) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for evaluation in best.evaluation["constraints"]:
@@ -1048,14 +1125,16 @@ def _unknowns(best: _ConfigResult, with_details: bool) -> list[dict[str, Any]]:
     for target in best.targets:
         if "reason" in target:
             item = {"target": target["id"], "fact": target["fact"], "reason": target["reason"]}
-            if (with_details or target["reason"] == SAMPLING_UNSPECIFIED) and target.get("details"):
-                item["details"] = target["details"]
+            details = _ranking_unknown_details(target, with_details)
+            if details:
+                item["details"] = details
             out.append(item)
     for preference in best.preferences:
         if preference["value"] is None:
             item = {"preference": preference["id"], "fact": preference["fact"], "reason": preference["reason"]}
-            if (with_details or preference["reason"] == SAMPLING_UNSPECIFIED) and preference.get("details"):
-                item["details"] = preference["details"]
+            details = _ranking_unknown_details(preference, with_details)
+            if details:
+                item["details"] = details
             out.append(item)
     return out
 
@@ -1140,28 +1219,35 @@ def _prepare_query(s: _Session, raw: Any, base: str, warnings: list[dict[str, An
     records = s.records()
     per_record: dict[int, list[_ConfigResult]] = {}
     for config in scope.configs:
-        result = _evaluate_config(s, config, records[config["record_pk"]], q, base)
+        result = _evaluate_config(s, config, q, base)
         per_record.setdefault(config["record_pk"], []).append(result)
     warnings.extend(_unknown_shorthand_warnings(s, q, [s.view(c) for c in scope.configs], base))
 
     total = {"evaluated": len(per_record), MATCH: 0, UNCONFIRMED: 0, DOES_NOT_MATCH: 0,
              "excluded": {**scope.excluded, "hard_shortfall": 0, "outcome": 0}, "listed": 0}
-    ranked: list[tuple[tuple[Any, ...], dict[str, Any], _ConfigResult, list[_ConfigResult]]] = []
+    rankable: dict[int, list[_ConfigResult]] = {}
     for record_pk, results in per_record.items():
-        eligible = results
-        if q["mode"] == STARTING_POINT and q["hard_shortfall"] == "exclude":
-            eligible = [r for r in results if r.evaluation["counts"][DOES_NOT_MATCH] == 0]
-            if not eligible:
-                total["excluded"]["hard_shortfall"] += 1
-                continue
-        best = min(eligible, key=lambda r: r.choice_key)
-        others = [r for r in results if r is not best]
-        outcome = best.evaluation["outcome"]
+        best_hard = min(_hard_rank(result, q["mode"]) for result in results)
+        eligible = [result for result in results if _hard_rank(result, q["mode"]) == best_hard]
+        outcome = eligible[0].evaluation["outcome"]
+        if q["mode"] == STARTING_POINT and q["hard_shortfall"] == "exclude" and outcome == DOES_NOT_MATCH:
+            total["excluded"]["hard_shortfall"] += 1
+            continue
         total[outcome] += 1
         if outcome not in q["include"]:
             total["excluded"]["outcome"] += 1
             continue
-        ranked.append((best.sort_key, records[record_pk], best, others))
+        rankable[record_pk] = eligible
+    _sampled_ranking_unknowns([result for results in rankable.values() for result in results])
+
+    ranked: list[tuple[tuple[Any, ...], dict[str, Any], _ConfigResult, list[_ConfigResult]]] = []
+    for record_pk, eligible in rankable.items():
+        record = records[record_pk]
+        for result in eligible:
+            _rank_config(result, record["record_id"], q, base)
+        best = min(eligible, key=lambda r: r.choice_key)
+        others = [r for r in per_record[record_pk] if r is not best]
+        ranked.append((best.sort_key, record, best, others))
     ranked.sort(key=lambda item: item[0])
     total["listed"] = len(ranked)
     named = _named_fact_keys(s, q)
@@ -1417,16 +1503,24 @@ def _one_or_list(values: Sequence[Any]) -> Any:
     return distinct[0] if len(distinct) == 1 else distinct
 
 
+def _public_condition_json(text: str | None) -> str | None:
+    if text is None or '"source"' not in text:
+        return text
+    value = public_fact_value(json.loads(text))
+    return canonical_key(value) if value else None
+
+
 def _variant(row: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
     """What makes two values of a fact key comparable: conditions, qualifiers and sampling grid."""
-    return row["conditions_json"], row["qualifiers_json"], row["sampled_field_fractions_json"]
+    return (_public_condition_json(row["conditions_json"]), _public_condition_json(row["qualifiers_json"]),
+            row["sampled_field_fractions_json"])
 
 
 def _field_summary(s: _Session, key: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     numbers = [r["value_num"] for r in rows if r["value_num"] is not None]
     numbers += [v for r in rows for v in (r["value_min"], r["value_max"]) if v is not None]
     variants = {_variant(r) for r in rows}
-    condition_keys = sorted({k for r in rows if r["conditions_json"] for k in json.loads(r["conditions_json"])})
+    condition_keys = sorted({key for conditions, _, _ in variants if conditions for key in json.loads(conditions)})
     return {
         "records": len({r["record_pk"] for r in rows}),
         "unit": _one_or_list([r["unit"] for r in rows if r["unit"] is not None]),
@@ -1559,7 +1653,7 @@ def _example(s: _Session, key: str, rows: list[dict[str, Any]],
     elif kind == "none":
         example.update({"path": paths[-1] if paths else "value", "op": "gte", "value": 0})
     elif kind == "list":
-        value = json.loads(row["value_json"])
+        value = public_fact_value(json.loads(row["value_json"]))
         example.update({"op": "includes_all", "value": value[:2]})
     elif kind in ("string", "bool"):
         example.update({"op": "eq", "value": json.loads(row["value_json"])})
@@ -1655,31 +1749,27 @@ def compare(index: Index, refs: Sequence[str], fields: Sequence[str] | None = No
         unit_sets = {tuple(sorted({r["unit"] for r in rows if r["unit"] is not None})) for _, rows in present}
         if len(unit_sets - {()}) > 1:
             differs.append("unit")
-        singles = [rows[0] for _, rows in present if len(rows) == 1]
-        if len({r["conditions_json"] for r in singles}) > 1:
-            differs.append("conditions")
-        if len({r["qualifiers_json"] for r in singles}) > 1:
-            differs.append("qualifiers")
-        if len({r["sampled_field_fractions_json"] for r in singles}) > 1:
-            differs.append("sampled_field_fractions")
-            for cell, rows in zip(cells, per):
-                if cell is not None and rows and len(rows) == 1:
-                    grid = rows[0]["sampled_field_fractions_json"]
-                    cell["sampled_field_fractions"] = None if grid is None else json.loads(grid)
-        if "conditions" in differs or "qualifiers" in differs:
-            for cell, rows in zip(cells, per):
-                if cell is not None and rows and len(rows) == 1:
-                    if rows[0]["conditions_json"] is not None:
-                        cell["conditions"] = json.loads(rows[0]["conditions_json"])
-                    if rows[0]["qualifiers_json"] is not None:
-                        cell["qualifiers"] = json.loads(rows[0]["qualifiers_json"])
+        singles = [(cell, rows[0]) for cell, rows in present if len(rows) == 1]
+        variants = [(cell, _variant(row)) for cell, row in singles]
+        labels = ("conditions", "qualifiers", "sampled_field_fractions")
+        for i, label in enumerate(labels):
+            if len({variant[i] for _, variant in variants}) > 1:
+                differs.append(label)
+        show_context = "conditions" in differs or "qualifiers" in differs
+        for cell, (conditions, qualifiers, grid) in variants:
+            if show_context and conditions is not None:
+                cell["conditions"] = json.loads(conditions)
+            if show_context and qualifiers is not None:
+                cell["qualifiers"] = json.loads(qualifiers)
+            if "sampled_field_fractions" in differs:
+                cell["sampled_field_fractions"] = None if grid is None else json.loads(grid)
         row_out: dict[str, Any] = {"fact": key, "values": cells, "comparable": not differs}
         if differs:
             row_out["differs_by"] = differs
         missing = [i for i, rows in enumerate(per) if not rows]
         if missing:
             row_out["missing"] = missing
-        texts = {r["conditions_text"] for r in singles}
+        texts = {row["conditions_text"] for _, row in singles}
         if len(texts) > 1:
             row_out["notes"] = ["conditions_text differs (prose conditions, information only)"]
         rows_out.append(row_out)
@@ -1704,59 +1794,18 @@ def _fact_object(view: dict[str, Any], row: dict[str, Any]) -> Any:
     return _at_path(view, ".".join(list(scope) + path.split(".")))
 
 
-def _related_checks(view: dict[str, Any], key: str, check_members: Sequence[str]) -> dict[str, Any]:
-    """Check objects (engine_check, property_list_comparison) of the fact's section that concern it."""
-    segments = key.split(".")
-    if len(segments) < 2:
-        return {}
-    section = view.get(segments[0])
-    if not isinstance(section, dict):
-        return {}
-    member = segments[1]
-    stem = re.sub(r"_(mm|deg|nm|um|percent|lp_mm)$", "", member)
-    out: dict[str, Any] = {}
-    for name in check_members:
-        check = section.get(name)
-        if name in _SECTION_WIDE_CHECKS and check is not None:
-            out[name] = check
-            continue
-        if not isinstance(check, dict):
-            continue
-        if check.get("quantity") in (member, stem):
-            out[name] = check
-            continue
-        picked: dict[str, Any] = {}
-        for sub, value in check.items():
-            if sub in (member, stem) or (isinstance(sub, str) and sub.startswith(stem)):
-                picked[sub] = value
-            elif isinstance(value, dict):
-                inner = {k: v for k, v in value.items() if k in (member, stem)}
-                if inner:
-                    picked[sub] = inner
-        if picked:
-            if isinstance(check.get("basis"), str):
-                picked["basis"] = check["basis"]
-            out[name] = picked
-    return out
-
-
-def _fact_full(s: _Session, view: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
-    entry: dict[str, Any] = {"json_path": row["json_path"], "value": _fact_object(view, row), "unit": row["unit"],
-                             "basis": row["basis"], "basis_class": row["basis_class"]}
+def _fact_full(view: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
+    entry: dict[str, Any] = {"json_path": row["json_path"], "value": public_fact_value(_fact_object(view, row)),
+                             "unit": row["unit"], "basis": row["basis"], "basis_class": row["basis_class"]}
     for name in ("definition", "conditions_text", "eligible_for", "state", "system_aperture"):
         if row[name] is not None:
             entry[name] = row[name]
     if row["conditions_json"] is not None:
-        entry["conditions"] = json.loads(row["conditions_json"])
+        entry["conditions"] = public_fact_value(json.loads(row["conditions_json"]))
     if row["qualifiers_json"] is not None:
-        entry["qualifiers"] = json.loads(row["qualifiers_json"])
+        entry["qualifiers"] = public_fact_value(json.loads(row["qualifiers_json"]))
     if row["sampled_field_fractions_json"] is not None:
         entry["sampled_field_fractions"] = json.loads(row["sampled_field_fractions_json"])
-    obj = entry["value"]
-    if isinstance(obj, dict) and isinstance(obj.get("source"), dict):
-        resolved = s.index.resolve_source(obj["source"])
-        entry["source"] = {"path": obj["source"].get("path"), "section": obj["source"].get("section"),
-                           "status": resolved["status"]}
     return entry
 
 
@@ -1782,8 +1831,9 @@ class _EvidenceScope:
     selected: set[int]
     """Ordinals of the selected configurations."""
     configuration_ids: dict[int, str | None]
-    pair_refs: dict[tuple[str | None, str | None], set[int]]
-    file_refs: dict[str | None, set[int]]
+    pair_refs: dict[tuple[str | None, str | None], set[int]] = field(default_factory=dict)
+    file_refs: dict[str | None, set[int]] = field(default_factory=dict)
+    reference_configs: dict[tuple[str | None, str | None, str | None], set[int]] = field(default_factory=dict)
     documents: dict[str, tuple[str, Any]] = field(default_factory=dict)
     """Candidate files: path -> (sha256, parsed JSON of the verified bytes)."""
     damaged: dict[str, str] = field(default_factory=dict)
@@ -1800,13 +1850,16 @@ class _EvidenceScope:
 
     def lists(self, ref: dict[str, Any]) -> bool:
         """Whether an evidence_refs row belongs in the scoped listing."""
-        entry = _ENTRY_REF_FIELD.match(ref["field"])
-        if entry is not None and int(entry.group(1)) not in self.selected:
-            return False
+        location = ref["field"]
         path = _evidence_path(ref["path"])
-        if ref["field"] == "collection.evidence_extract":
+        if location == "collection.evidence_extract":
             return not self.excluded_file(path)
-        return not self.excluded_pair(path, ref["section"])
+        if location == NOTICE_FIELD:
+            return False
+        entry = _ENTRY_REF_FIELD.match(location)
+        ordinals = self.selected if entry is None else self.selected & {int(entry.group(1))}
+        referring = self.reference_configs.get((path, ref["section"], ref["sha256"]))
+        return bool(referring and ordinals & referring)
 
     def sections(self, path: str) -> list[str]:
         """The applicable section names of a candidate file, sorted."""
@@ -1830,32 +1883,28 @@ class _EvidenceScope:
         return [self.configuration_ids[ordinal] for ordinal in sorted(refs or ())]
 
 
-def _evidence_scope(s: _Session, record_pk: int, record: dict[str, Any], configuration: str | None,
-                    config: dict[str, Any]) -> _EvidenceScope:
-    configs = s.index.configurations(record_pk, with_view=True)
-    selected = {config["ordinal"]} if configuration is not None else {c["ordinal"] for c in configs}
-    scope = _EvidenceScope(selected, {c["ordinal"]: c["configuration_id"] for c in configs}, {}, {})
+def _evidence_scope(s: _Session, configs: list[dict[str, Any]], rows: list[dict[str, Any]],
+                    selected_ordinal: int | None, project_sha: str, revision: int) -> _EvidenceScope:
+    selected = {selected_ordinal} if selected_ordinal is not None else {c["ordinal"] for c in configs}
+    scope = _EvidenceScope(selected, {c["ordinal"]: c["configuration_id"] for c in configs})
     candidates: dict[str, set[str]] = {}
-    rows = s.index.evidence_refs(record_pk)
-    # An extract reference the build rejected (--allow-unresolved-evidence) contributes no file,
-    # even when another reference put those bytes in the index (e.g. another record's extract).
-    extract_rejected = any(ref["field"] == "collection.evidence_extract"
-                           and ref["build_status"] not in ("RESOLVED", "SECTION_MISSING") for ref in rows)
     for item in configs:
-        for location, ref in iter_source_refs(item["view"]):
-            if extract_rejected and location == "collection.evidence_extract":
-                continue
+        ordinal = item["ordinal"]
+        for _, ref in iter_source_refs(item["view"]):
             path = _evidence_path(ref.get("path"))
             section = ref.get("section") if isinstance(ref.get("section"), str) else None
-            scope.pair_refs.setdefault((path, section), set()).add(item["ordinal"])
-            scope.file_refs.setdefault(path, set()).add(item["ordinal"])
-            if item["ordinal"] in selected and path is not None and isinstance(ref.get("sha256"), str):
+            digest = ref.get("sha256") if isinstance(ref.get("sha256"), str) else None
+            scope.pair_refs.setdefault((path, section), set()).add(ordinal)
+            scope.file_refs.setdefault(path, set()).add(ordinal)
+            scope.reference_configs.setdefault((path, section, digest), set()).add(ordinal)
+            if ordinal in selected and path is not None and digest is not None:
+                candidates.setdefault(path, set()).add(digest)
+    # A rejected extract contributes no file, even if another record references the same bytes.
+    for ref in rows:
+        if ref["field"] == "collection.evidence_extract" and ref["build_status"] in ("RESOLVED", "SECTION_MISSING"):
+            path = _evidence_path(ref["path"])
+            if path is not None and ref["sha256"] is not None and not scope.excluded_file(path):
                 candidates.setdefault(path, set()).add(ref["sha256"])
-    extract = (record.get("collection") or {}).get("evidence_extract")
-    if not extract_rejected and isinstance(extract, dict) and isinstance(extract.get("sha256"), str):
-        path = _evidence_path(extract.get("path"))
-        if path is not None and not scope.excluded_file(path):
-            candidates.setdefault(path, set()).add(extract["sha256"])
     # (path, sha256) pairs that reached a stored file at build: failing now means damage. A pair
     # the build rejected (--allow-unresolved-evidence) is merely unresolved.
     stored_at_build = {(_evidence_path(ref["path"]), ref["sha256"]) for ref in rows
@@ -1870,9 +1919,14 @@ def _evidence_scope(s: _Session, record_pk: int, record: dict[str, Any], configu
                     scope.damaged[path] = status
                 continue
             try:
-                scope.documents[path] = (sha, json.loads(content.decode("utf-8")))
+                document = json.loads(content.decode("utf-8"))
             except (UnicodeDecodeError, ValueError, RecursionError):
                 continue
+            if isinstance(document, dict) and any(
+                analysis_applies(document, project_sha, scope.configuration_ids[ordinal], revision)
+                for ordinal in selected
+            ):
+                scope.documents[path] = (sha, document)
     return scope
 
 
@@ -1979,8 +2033,7 @@ def _prescription(project: Any, level: str, native_ids: list[Any]) -> dict[str, 
     }
 
 
-def _license(record: dict[str, Any]) -> dict[str, Any]:
-    collection = record.get("collection") or {}
+def _license(collection: dict[str, Any]) -> dict[str, Any]:
     license_obj = collection.get("license") if isinstance(collection.get("license"), dict) else {}
     out: dict[str, Any] = {}
     for name in ("spdx", "copyright", "notice_path"):
@@ -1991,37 +2044,31 @@ def _license(record: dict[str, Any]) -> dict[str, Any]:
         match = _LICENSE_PATH.search(redistribution)
         if match:
             out["notice_path"] = match.group(1)
-    out["redistribution"] = redistribution
+    if isinstance(redistribution, str):
+        out["redistribution"] = redistribution
     return out
 
 
-def _validation_summary(validation: Any) -> Any:
-    if not isinstance(validation, dict):
-        return validation
-    out: dict[str, Any] = {}
-    for key, value in validation.items():
-        if isinstance(value, (str, int, float, bool)) or value is None:
-            out[key] = value
-        elif isinstance(value, list):
-            out[key] = {"items": len(value)}
-    return out
+def _provenance(collection: dict[str, Any]) -> dict[str, Any]:
+    return {**{key: collection[key] for key in _PROVENANCE_MEMBERS if key in collection},
+            "license": _license(collection)}
+
+
+def _configuration_summary(config: dict[str, Any]) -> dict[str, Any]:
+    return {key: config[key] for key in ("configuration_id", "label", "native", "ordinal")}
 
 
 def inspect(index: Index, record_id: str, *, revision: int | None = None, configuration: str | None = None,
             fields: Sequence[str] | None = None, sections: Sequence[str] | None = None,
             evidence: Sequence[str] | None = None, prescription: str | None = None,
-            max_output_bytes: int | None = None) -> dict[str, Any]:
-    """One record in detail.
+            provenance: bool = False, max_output_bytes: int | None = None) -> dict[str, Any]:
+    """One record's identity, native Project metadata, configurations, facets and available facts.
 
-    Default result: identity, provenance, license, native Project metadata, configurations,
-    validation summary, facets, the fact keys of the selected configuration and the evidence
-    references and sections available. The evidence is scoped to `configuration`, or covers every
-    configuration when none is named (see `_EvidenceScope`). `fields` adds those facts in full (a
-    section name or key prefix selects every fact under it); `sections` adds whole view sections;
-    `evidence` (section names, `path#section` or "all") adds sections of the record's verified
-    evidence extracts, keyed by path; `prescription` ("summary" | "full")
-    adds the native Project's optical model overview or its models, materials and coatings. A
-    response over the byte budget raises OUTPUT_LIMIT_EXCEEDED: narrow the request.
+    `fields` adds selected facts by key or prefix. `sections` adds selected Project fact sections.
+    Supporting evidence is scoped to `configuration` when supplied and covers all configurations
+    otherwise. `evidence` selects verified calculation sections by name, `path#section` or "all".
+    `prescription` selects a native model overview ("summary") or details ("full"). `provenance`
+    adds the direct source, attribution and license terms. Oversized results raise OUTPUT_LIMIT_EXCEEDED.
     """
     s = _Session(index)
     budget = output.check_max_output_bytes(max_output_bytes, "max_output_bytes")
@@ -2031,16 +2078,18 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
     view = config["view"]
     project_meta = s.index.project(row["record_pk"])
     facts = s.config_facts(config["config_pk"])
-    collection = record.get("collection") or {}
-    design = record.get("design") or {}
+    design = view.get("design") or {}
     record_facets: dict[str, list[str]] = {}
     for name in s.vocab.facet_names():
         values = sorted(s.facets_of(config, name))
         if values:
             record_facets[name] = values
-    evidence_scope = _evidence_scope(s, row["record_pk"], record, configuration, config)
+    configs = s.index.configurations(row["record_pk"], with_view=True)
+    refs = s.index.evidence_refs(row["record_pk"])
+    selected_ordinal = config["ordinal"] if configuration is not None else None
+    evidence_scope = _evidence_scope(s, configs, refs, selected_ordinal, project_meta["sha256"], row["revision"])
     grouped_refs: dict[tuple[Any, Any, Any], int] = {}
-    for ref in s.index.evidence_refs(row["record_pk"]):
+    for ref in refs:
         if not evidence_scope.lists(ref):
             continue
         grouped_refs[(ref["path"], ref["section"], ref["status"])] = grouped_refs.get(
@@ -2048,19 +2097,14 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
     result: dict[str, Any] = {
         "record_id": row["record_id"], "revision": row["revision"], "title": row["title"],
         "record_schema_version": row["record_schema_version"], "record_hash": row["record_hash"],
-        "collection": {k: collection.get(k) for k in ("collection_id", "source", "attribution") if k in collection},
-        "license": _license(record),
+        "collection": {"collection_id": row["collection_id"]},
         "design": {k: design.get(k) for k in ("design_family_id", "design_scope", "lens_type", "conjugate",
                                               "configuration_count") if k in design},
         "native_project": {"path": row["project_path"], "sha256": project_meta["sha256"],
                            "size_bytes": project_meta["size_bytes"], "engine_version": row["engine_version"],
                            "native_configuration_ids": project_meta["native_configuration_ids"]},
-        "configuration": {"configuration_id": config["configuration_id"], "label": config["label"],
-                          "native": config["native"], "ordinal": config["ordinal"]},
-        "configurations": [{"configuration_id": c["configuration_id"], "label": c["label"],
-                            "native": c["native"], "ordinal": c["ordinal"]}
-                           for c in s.index.configurations(row["record_pk"], with_view=False)],
-        "validation": _validation_summary(record.get("validation")),
+        "configuration": _configuration_summary(config),
+        "configurations": [_configuration_summary(c) for c in configs],
         "facets": record_facets,
         "fact_keys": sorted(facts),
         "evidence": {
@@ -2075,9 +2119,12 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
             "fields": f"os-optics-lens inspect {row['record_id']} --fields <fact_key,...>",
             "evidence": f"os-optics-lens inspect {row['record_id']} --evidence <section|path#section|all>",
             "prescription": f"os-optics-lens inspect {row['record_id']} --prescription summary",
+            "provenance": f"os-optics-lens inspect {row['record_id']} --provenance",
             "project": f"os-optics-lens project {row['record_id']} --out <file>",
         },
     }
+    if provenance:
+        result["provenance"] = _provenance(record.get("collection") or {})
     if fields is not None:
         keys = _string_list(list(fields), "/fields", "fields")
         selected: dict[str, Any] = {}
@@ -2089,14 +2136,9 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
                     selected[key] = None
                     continue
                 raise s.unknown_field(key, _ptr("/fields", i))
-            check_members = s.vocab.fact_extraction.get("check_members", [])
             for k in matched:
-                entries = [_fact_full(s, view, r) for r in facts[k]]
-                item: dict[str, Any] = {"facts": entries} if len(entries) > 1 else dict(entries[0])
-                checks = _related_checks(view, k, check_members)
-                if checks:
-                    item["checks"] = checks
-                selected[k] = item
+                entries = [_fact_full(view, r) for r in facts[k]]
+                selected[k] = {"facts": entries} if len(entries) > 1 else entries[0]
         result["fields"] = selected
     if sections is not None:
         names = _string_list(list(sections), "/sections", "sections")
@@ -2107,7 +2149,7 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
                 raise LensError("UNKNOWN_FIELD", f"the configuration view has no section {name!r}",
                                 hint="sections: " + ", ".join(sorted(view)),
                                 details={"pointer": _ptr("/sections", i), "section": name, "did_you_mean": close})
-            chosen[name] = view[name]
+            chosen[name] = public_fact_value(view[name])
         result["sections"] = chosen
     if evidence is not None:
         names = _string_list(list(evidence), "/evidence", "evidence")
@@ -2138,19 +2180,17 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
 def project_metadata(index: Index, record_id: str, *, revision: int | None = None) -> dict[str, Any]:
     """Metadata of a record's native Project (no I/O).
 
-    `{record_id, revision, sha256, size_bytes, native_configuration_ids, engine_version, license
-    {spdx?, copyright?, notice_path?, redistribution}, attribution, next}`. The sha256 is over the
-    exact LF bytes `project_bytes` returns and equals the record's `native_project.sha256`.
+    The sha256 is over the exact LF bytes `project_bytes` returns and equals the record's
+    `native_project.sha256`.
     """
     row = index.get_record(record_id, revision)
     meta = index.project(row["record_pk"])
-    record = row["record"]
-    collection = record.get("collection") or {}
+    configs = index.configurations(row["record_pk"], with_view=False)
     return {
         "record_id": row["record_id"], "revision": row["revision"], "sha256": meta["sha256"],
         "size_bytes": meta["size_bytes"], "native_configuration_ids": meta["native_configuration_ids"],
-        "engine_version": row["engine_version"], "license": _license(record),
-        "attribution": collection.get("attribution"),
+        "engine_version": row["engine_version"],
+        "configurations": [_configuration_summary(config) for config in configs],
         "next": (f"Write the exact Project bytes with `os-optics-lens project {row['record_id']} --out <file>` "
                  "(add --force to overwrite), then open, check or evaluate it with os-optics."),
     }

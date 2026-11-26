@@ -65,7 +65,7 @@ class Discovery(unittest.TestCase):
         result = query.fields(INDEX, {"facets": {"collection": ["lenslibrary"]}}, limit=500)["result"]
         efl = result["fields"][EFL]
         self.assertEqual(efl["records"], len(lenslibrary_records()))
-        values = [r["first_order"]["effective_focal_length_mm"]["value"] for r in lenslibrary_records()]
+        values = [r["first_order"]["engine_check"]["effective_focal_length_mm"] for r in lenslibrary_records()]
         self.assertEqual((efl["min"], efl["max"]), (min(values), max(values)))
         self.assertEqual(efl["unit"], "mm")
 
@@ -98,13 +98,10 @@ class Searches(unittest.TestCase):
                    "constraints": [{"fact": "field.half_field_deg", "op": "gte", "value": 40}],
                    "include": ["MATCH", "UNCONFIRMED", "DOES_NOT_MATCH"], "limit": 50}
         result = query.search(INDEX, request)["result"]
-        records = {r["record_id"]: r for r in lenslibrary_records()}
+        self.assertTrue(result["candidates"])
         for candidate in result["candidates"]:
-            half = records[candidate["record_id"]]["field"].get("half_field_deg")
-            if half is None:
-                self.assertEqual(candidate["outcome"], "UNCONFIRMED")
-            else:
-                self.assertEqual(candidate["outcome"], "MATCH" if half >= 40 else "DOES_NOT_MATCH")
+            self.assertEqual(candidate["outcome"], "UNCONFIRMED")
+            self.assertEqual(candidate["constraints"]["c0"]["reason"], "FACT_MISSING")
 
     def test_compare_and_inspect(self) -> None:
         ids = [r["record_id"] for r in lenslibrary_records()[:3]]

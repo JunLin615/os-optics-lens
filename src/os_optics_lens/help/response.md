@@ -73,8 +73,9 @@ A candidate (one record, at its best configuration):
   target score is the sum of `weight * normalized`.
 * `unknowns`: `{constraint | target | preference, reason}` for everything UNCONFIRMED or not
   comparable (full detail adds `details`).
-* `facts`: summary facts `{value, unit, basis}`; compact `basis` is the basis class
-  (SOURCE_STATED, DERIVED, ENGINE_COMPUTED, OTHER), full detail gives the verbatim basis.
+* `facts` holds summary facts `{value, unit, basis}`. Compact `basis` gives the class
+  (`PROJECT_DECLARED`, `PROJECT_DERIVED`, `ENGINE_COMPUTED`, `DERIVED` or `OTHER`). Full detail
+  gives the verbatim basis.
   Multi-valued facts show `{values: n, min, max, unit}`. Discovery-only facts carry
   `eligible_for: "DISCOVERY_ONLY"`. Defaults: EFL, the system aperture, the field, image circle,
   total track, sampling span and every fact named by the query (at most 12); `fields` overrides.
@@ -106,16 +107,16 @@ A batch returns `"results": [{"index": 0, "ok": true, "result": {...}}, {"index"
   `multi_valued`, `unit`, `conditions`, `qualifiers` or `sampled_field_fractions`; when grids
   differ, each single-valued cell shows its `sampled_field_fractions` (`null` without one). Refs
   must name distinct configurations; `ID@` (empty configuration id) is `INVALID_REQUEST`.
-* `inspect`: identity, `collection`, `license`, `design`, `native_project`, `configuration(s)`,
-  `validation`, `facets`, `fact_keys`, `evidence {refs, sections, files}` (statuses are checked
-  against the stored bytes now; a damaged file is marked `status` in `files` and lists no
-  sections), `next`; plus requested
-  `fields` (with `checks` for provenance checks), `sections`, `evidence_sections: {path: {sha256,
-  sections: {name: content}}}`, `prescription`. `evidence` is scoped to `--configuration` (else
-  all configurations): `refs` `{path, section, status, count}`, `sections` `{path: [names]}`,
-  `files` `{path: {configurations: [ids referencing the file]}}` (`help semantics`).
-* `project`: `{record_id, revision, sha256, size_bytes, native_configuration_ids, engine_version,
-  license, attribution, next}`; with `--out` also `path` (absolute) and `written_sha256`.
+* `inspect` returns identity, `collection {collection_id}`, `design`, `native_project`,
+  `configuration`, `configurations`, `facets`, `fact_keys`, `evidence` and `next`. Use `--fields`,
+  `--sections` and `--prescription` for Project details. `--evidence` returns `evidence_sections`
+  keyed by path, with `sha256` and `sections {name: content}` for each file. `evidence` lists
+  `refs {path, section, status, count}`, `sections {path: [names]}` and files with their
+  configuration IDs. A damaged file has a `status` and lists no sections. `--configuration`
+  narrows these lists to one configuration. `--provenance` adds `provenance` with the direct
+  source, attribution and `license` terms when available.
+* `project` returns `{record_id, revision, sha256, size_bytes, native_configuration_ids,
+  configurations, engine_version, next}`. `--out` adds `path` (absolute) and `written_sha256`.
   `--stdout` prints the raw Project bytes instead of JSON (`--max-output-bytes` is rejected
   there). The stored bytes are re-checked against `sha256` before anything is written; `--out`
   replaces the target only after the written bytes hash correctly, and a path that cannot be

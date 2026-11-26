@@ -110,14 +110,6 @@
           "path": "height_mm",
           "op": "eq",
           "value": 24
-        },
-        {
-          "path": "pixel_pitch_um",
-          "op": "eq",
-          "value": [
-            12,
-            12
-          ]
         }
       ]
     },

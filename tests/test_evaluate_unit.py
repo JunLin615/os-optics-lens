@@ -413,7 +413,7 @@ class Shorthand(unittest.TestCase):
         self.assertEqual(result["outcome"], "MATCH")
         self.assertEqual(result["fact"]["json_path"], "performance[0]")
         self.assertEqual(result["fact"]["value"], 0.9679991689193085)
-        self.assertEqual(result["fact"]["source"]["status"], "RESOLVED")
+        self.assertNotIn("source", result["fact"])
         ambiguous = run(SONNAR, {"id": "m", "fact": "performance.mtf", "op": "gt", "value": 0.9})
         self.assertEqual(ambiguous["reason"], "AMBIGUOUS_FACTS")
         self.assertIn("direction", ambiguous["details"]["distinguishing"])

@@ -30,6 +30,7 @@ from .normalize import (
     record_facets,
     system_aperture_names,
 )
+from .project_facts import PHONE_COLLECTIONS, analysis_applies, project_view
 from .vocabulary import Vocabulary, load_vocabulary
 
 RECORD_SCHEMA = "opensci.lens.record"
@@ -737,6 +738,18 @@ class _Loader:
         return Corpus(self.root, normalized, evidence, dict(sorted(self.licenses.items())),
                       sort_findings(self.findings))
 
+    def analysis_document(self, reference: Any) -> dict[str, Any] | None:
+        if not isinstance(reference, dict):
+            return None
+        path = corpus_relative_path(reference.get("path"))
+        if path is None:
+            return None
+        state = self.file_state(path)
+        if state.sha256 != reference.get("sha256") or state.content is None:
+            return None
+        self.parsed_evidence(state)
+        return state.parsed if isinstance(state.parsed, dict) and state.problem is None else None
+
     def check_record(self, file: str, record: dict[str, Any], rid: str) -> NormalizedRecord | None:
         """Identity, hash, Project, configuration, evidence and normalization checks for one record."""
         parts = file.split("/")
@@ -770,16 +783,27 @@ class _Loader:
             issues.append(Issue(ERROR, "CONFIGURATION_COUNT_MISMATCH", "design.configuration_count",
                                 f"design.configuration_count is {count} but the record indexes {len(views)} "
                                 "configuration(s)"))
-        facets, facet_issues = record_facets(record, self.vocab)
-        issues.extend(facet_issues)
         config_facets: dict[str, list[FacetValue]] = {}
         facts: dict[str, list[dict[str, Any]]] = {}
+        project_digest = sha256_hex(project_bytes) if project_bytes is not None else None
+        revision = record.get("record_revision")
+        extract = self.analysis_document(collection.get("evidence_extract"))
         for view in views:
+            def applies(reference: dict[str, Any]) -> bool:
+                document = self.analysis_document(reference)
+                return document is None or analysis_applies(document, project_digest, view.configuration_id, revision)
+
+            camera_evidence = (extract is not None and extract.get("native_project_sha256") == project_digest
+                               and extract.get("record_id") == rid
+                               and analysis_applies(extract, project_digest, view.configuration_id, revision))
+            declares_aperture = bool(system_aperture_names(view.view))
+            view.view = project_view(view.view, project, as_written=not natives,
+                                     applies=applies, camera_evidence=camera_evidence)
             values, view_issues = configuration_facets(view.view, self.vocab)
             config_facets[view.configuration_key] = values
             issues.extend(view_issues)
             facts[view.configuration_key] = extract_facts(view.view, self.vocab)
-            if not system_aperture_names(view.view):
+            if not declares_aperture and not system_aperture_names(view.view):
                 issues.append(Issue(WARNING, "NO_SYSTEM_APERTURE", "aperture",
                                     "no aperture fact is marked system_aperture: true"
                                     + (f" in configuration {view.configuration_id}" if view.configuration_id else "")))
@@ -787,20 +811,26 @@ class _Loader:
                 if fact["value_num"] is not None and fact["unit"] is None and not fact["fact_key"].startswith("design."):
                     issues.append(Issue(WARNING, "UNIT_UNKNOWN", fact["fact_key"],
                                         f"no unit can be inferred for numeric fact {fact['fact_key']}"))
-        for issue in issues:
+        facets, facet_issues = record_facets(views[0].view if views else record, self.vocab)
+        for issue in (*issues, *facet_issues):
             issue_file = project_path if issue.in_project and project_path else file
             self.add(issue.severity, issue.code, rid, issue_file, issue.field, issue.message)
 
         if project_path is None or project_bytes is None or project is None:
             return None
         native = record["native_project"]
+        title = record.get("title")
+        if isinstance(collection_id, str) and collection_id in PHONE_COLLECTIONS:
+            # These intake titles embed printed f-numbers and field angles.
+            role = design.get("module_role")
+            title = f"{role.replace('_', ' ').capitalize()} phone lens" if isinstance(role, str) else "Phone lens"
         return NormalizedRecord(
             file=file,
             record=record,
             record_id=rid,
             revision=record.get("record_revision"),
             schema_version=record.get("record_schema_version"),
-            title=record.get("title"),
+            title=title,
             collection_id=collection_id,
             family_id=design.get("design_family_id") if isinstance(design.get("design_family_id"), str) else None,
             design_scope=design.get("design_scope") if isinstance(design.get("design_scope"), str) else None,

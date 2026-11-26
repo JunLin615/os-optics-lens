@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = "lenslibrary-1792917"
 NEW_ID = "growth-test-1792917"
 NEW_COLLECTION = "growth-test"
+EFL = "first_order.effective_focal_length_mm"
 
 
 class Rebuild(unittest.TestCase):
@@ -48,16 +49,22 @@ class Rebuild(unittest.TestCase):
         record["collection"]["collection_id"] = NEW_COLLECTION
         record["design"]["design_family_id"] = NEW_ID
         record["native_project"]["path"] = f"records/{NEW_COLLECTION}/{NEW_ID}/project.json"
-        record["first_order"]["effective_focal_length_mm"]["value"] = 777.0
+        engine = record["first_order"]["engine_check"]
+        record["first_order"]["effective_focal_length_mm"] = {
+            "value": engine["effective_focal_length_mm"],
+            "basis": "ENGINE_COMPUTED",
+            "conditions": {"wavelength_nm": engine["wavelength_nm"]},
+        }
         record["record_hash"] = record_hash(record)
         (target_dir / "record.json").write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
                                                 encoding="utf-8")
 
     def test_add_record_then_rebuild(self) -> None:
         first = build_index(self.root, self.out)
-        request = {"mode": "starting_point", "targets": [{"fact": "first_order.effective_focal_length_mm",
-                                                          "target": 800, "tolerance": 50}], "limit": 2}
         with open_index(self.out) as index:
+            source = query.inspect(index, SOURCE, fields=[EFL])["result"]["fields"][EFL]
+            target = source["value"]["value"]
+            request = {"mode": "starting_point", "targets": [{"fact": EFL, "target": target}], "limit": 2}
             old = query.search(index, request)
             cursor = old["result"]["page"]["next_cursor"]
             self.assertIsNotNone(cursor)
@@ -72,7 +79,9 @@ class Rebuild(unittest.TestCase):
         with open_index(self.out) as index:
             self.assertEqual(index.snapshot_id, second.snapshot_id)
             fresh = query.search(index, request)
-            self.assertEqual(fresh["result"]["candidates"][0]["record_id"], NEW_ID)
+            candidate = fresh["result"]["candidates"][0]
+            self.assertEqual(candidate["record_id"], NEW_ID)
+            self.assertEqual(candidate["shortfalls"][0]["deviation"], 0)
             self.assertEqual(fresh["snapshot"]["id"], second.snapshot_id)
             with self.assertRaises(LensError) as caught:
                 query.search(index, dict(request, cursor=cursor))

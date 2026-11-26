@@ -88,20 +88,21 @@ def minimal_record(record_id: str, collection: str = "synth", evidence_path: str
         "native_project": {"path": f"records/{collection}/{record_id}/project.json", "sha256": "0" * 64,
                            "engine_version": "0.14.0"},
         "spectrum": {
+            "basis": "PROJECT_DECLARED",
             "sampling_wavelengths_nm": [486.1, 587.6, 656.3],
             "band_facets": ["visible"],
             "sampling_span_nm": {"min_nm": 486.1, "max_nm": 656.3, "eligible_for": "DISCOVERY_ONLY"},
             "continuous_coverage_nm": {"state": "UNCONFIRMED", "min_nm": None, "max_nm": None},
         },
-        "first_order": {"effective_focal_length_mm": {"value": 50.0, "basis": "SOURCE_STATED"}},
-        "aperture": {"f_number": {"value": 2.8, "basis": "SOURCE_STATED", "system_aperture": True}},
-        "field": {"kind": "ANGULAR", "half_field_deg": 23.0},
+        "first_order": {"effective_focal_length_mm": {"value": 50.0, "basis": "ENGINE_COMPUTED"}},
+        "aperture": {"f_number": {"value": 2.8, "basis": "ENGINE_COMPUTED", "system_aperture": True}},
+        "field": {"basis": "PROJECT_DECLARED", "kind": "ANGULAR", "half_field_deg": 23.0},
         "validation": {"paraxial": "MATCHED", "project_check": "ACCEPTED", "field": "NOT_CHECKED"},
         "record_hash_method": "SHA-256 over parsed JSON without record_hash and record_hash_method",
     }
     if evidence_path:
         record["performance"] = [{
-            "metric": "mtf_field_minimum", "basis": "DERIVED", "value": 0.7,
+            "metric": "mtf_field_minimum", "basis": "PROJECT_DERIVED", "value": 0.7,
             "conditions": {"frequency_lp_mm": 40},
             "source": {"path": evidence_path, "sha256": evidence_sha, "section": "mtf"},
         }]
@@ -303,8 +304,9 @@ class RealCorpusTests(unittest.TestCase):
                          ("", None, False, "project as written", 0))
         self.assertEqual(view.view["configuration"], {"configuration_id": None, "label": "project as written",
                                                       "native": False})
-        stripped = {key: value for key, value in view.view.items() if key != "configuration"}
-        self.assertEqual(stripped, record.record)
+        self.assertEqual(view.view["collection"], {"collection_id": "yutong-cup"})
+        self.assertNotIn("validation", view.view)
+        self.assertNotIn("engine_check", view.view["first_order"])
         for constraint in case["constraints"]:
             self.assertEqual(reference.evaluate(view.view, constraint), case["expected"]["outcome"], constraint["id"])
 
@@ -342,13 +344,14 @@ class RealCorpusTests(unittest.TestCase):
         self.assertEqual((coverage["state"], coverage["value_min"], coverage["value_max"]), ("UNCONFIRMED", None, None))
         wavelengths = by_key["spectrum.sampling_wavelengths_nm"][0]
         self.assertEqual(json.loads(wavelengths["value_json"]), [486, 587, 656])
-        self.assertTrue(wavelengths["basis"].startswith("SOURCE_STATED"))
+        self.assertEqual(wavelengths["basis"], "PROJECT_DECLARED")
         self.assertEqual(json.loads(by_key["image_format.cover_glass.material"][0]["value_json"]), "H-K9")
         self.assertEqual(by_key["image_format.cover_glass.thickness_mm"][0]["value_num"], 1.0)
-        self.assertEqual(by_key["image_format.pixel_pitch_um"][0]["basis"][:13], "SOURCE_STATED")
+        self.assertNotIn("image_format.pixel_pitch_um", by_key)
         stop = by_key["aperture.stop_opening_diameter_mm"][0]
         self.assertTrue(stop["system_aperture"])
-        self.assertEqual(by_key["field.half_field_deg"][0]["state"], "MATCHED")
+        self.assertEqual(by_key["field.half_field_deg"][0]["value_num"], 49.555169168052586)
+        self.assertIsNone(by_key["field.half_field_deg"][0]["state"])
         tolerance = by_key["analysis_evidence.tolerance"][0]
         self.assertEqual(json.loads(tolerance["value_json"])["mtf_gate"]["passed"], 92)
         self.assertEqual(tolerance["state"], "simulated")
@@ -357,15 +360,14 @@ class RealCorpusTests(unittest.TestCase):
 
     def test_lenslibrary_fact_samples(self):
         facts = {f["fact_key"]: f for f in self.records["lenslibrary-6744570a"].facts[""]}
-        system = facts["aperture.paraxial_working_f_number"]
-        self.assertEqual((system["value_num"], system["unit"], system["system_aperture"], system["basis_class"]),
-                         (4.0, "1", True, "SOURCE_STATED"))
-        self.assertEqual(facts["aperture.paraxial_working_f_number_from_dump"]["unit"], "1")
-        self.assertFalse(facts["aperture.working_f_number"]["system_aperture"])
-        full_field = facts["field.full_field_deg"]
-        self.assertEqual((full_field["value_num"], full_field["unit"]), (60.0, "deg"))
-        self.assertTrue(full_field["basis"].startswith("SOURCE_STATED"))
-        self.assertEqual(json.loads(facts["field.field_points_deg"]["value_json"]), [0.0, 20.0, 30.0])
+        system = facts["aperture.stop_opening_diameter_mm"]
+        self.assertEqual((system["unit"], system["system_aperture"], system["basis_class"]),
+                         ("mm", True, "PROJECT_DECLARED"))
+        self.assertNotIn("aperture.paraxial_working_f_number", facts)
+        self.assertNotIn("aperture.paraxial_working_f_number_from_dump", facts)
+        self.assertNotIn("aperture.working_f_number", facts)
+        self.assertNotIn("field.full_field_deg", facts)
+        self.assertNotIn("field.field_points_deg", facts)
         self.assertEqual(facts["design.aperture_validity.stop_blocks_light"]["value_json"], "true")
 
     def test_facets(self):
@@ -376,9 +378,9 @@ class RealCorpusTests(unittest.TestCase):
         self.assertIn(("application", "mobile_imaging", "RECORD"), values)
         self.assertIn(("function", "imaging", "VOCABULARY_MAPPING"), values)
         self.assertIn(("stop_state", "stop_blocking", "RECORD"), values)
-        self.assertIn(("validation", "paraxial_matched", "RECORD"), values)
+        self.assertFalse(any(facet == "validation" for facet, _, _ in values))
         config = {(v.facet, v.value) for v in record.config_facets[""]}
-        self.assertIn(("system_aperture", "paraxial_working_f_number"), config)
+        self.assertIn(("system_aperture", "stop_opening_diameter_mm"), config)
         self.assertIn(("conjugate", "infinite_to_finite"), config)
         self.assertIn(("band", "visible"), config)
         p2b = {(v.facet, v.value) for v in self.records[P2B].config_facets[""]}
@@ -531,7 +533,7 @@ class SyntheticFindingTests(unittest.TestCase):
             record["performance"][0]["source"]["section"] = "nope"
 
         self.corpus.add("rec-a", mutate=missing_file)
-        self.corpus.add("rec-b", mutate=missing_section)
+        record_b = self.corpus.add("rec-b", mutate=missing_section)
         self.corpus.add("rec-c")
         malformed = self.corpus.record_dir("synth", "rec-c") / "evidence.json"
         malformed.write_text('{"sections": []}\n', encoding="utf-8")
@@ -564,7 +566,7 @@ class SyntheticFindingTests(unittest.TestCase):
                         statuses[row["record_id"]] = ref["status"]
             self.assertEqual(statuses, {"rec-a": "FILE_MISSING", "rec-b": "SECTION_MISSING", "rec-c": "MALFORMED"})
             self.assertEqual(index.evidence_paths(), ["records/synth/rec-b/evidence.json"])
-            record_b = index.get_record("rec-b")["record"]
+            self.assertNotIn("performance", index.get_record("rec-b")["record"])
             self.assertEqual(index.resolve_source(record_b["performance"][0]["source"])["status"], "SECTION_MISSING")
             self.assertEqual({f["code"] for f in index.findings()},
                              {"EVIDENCE_FILE_MISSING", "EVIDENCE_SECTION_MISSING", "EVIDENCE_MALFORMED"})

@@ -114,14 +114,16 @@ os-optics-lens compare lenslibrary-528155 yutong-2025-mirrorless-18-p2b \
 A missing value is `null` with its position in `missing`. Rows whose units, conditions,
 qualifiers or sampling grids differ are `comparable: false` with `differs_by`.
 
-**5. Inspect** one candidate: the default lists fact keys and evidence sections. Then ask for
-what the decision needs:
+**5. Inspect** one candidate. Start with its Project identity, configuration, available fact keys
+and evidence section names. Request the Project facts, prescription or supporting analysis you
+need. Use `--provenance` for the record's direct source, attribution and redistribution terms.
 
 ```
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b --fields performance.mtf_field_minimum,first_order
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b --evidence field_performance
 os-optics-lens inspect yutong-2025-mirrorless-18-p2b --prescription summary
+os-optics-lens inspect lenslibrary-528155 --provenance
 ```
 
 **6. Project hand-off.**
@@ -133,8 +135,8 @@ os-optics-lens project yutong-2025-mirrorless-18-p2b --out work/p2b.project.json
 ```
 {"ok":true,"snapshot":{...},"result":{"record_id":"yutong-2025-mirrorless-18-p2b","revision":4,
  "sha256":"14090b01fe27afcd61f8a3e111b4e8a9bdf5e726237a2f822a07a88d1176cbe2","size_bytes":75650,
- "native_configuration_ids":[],"engine_version":"0.14.0","license":{"spdx":"MIT",...},
- "attribution":"...","next":"...","path":"/abs/path/work/p2b.project.json",
+ "native_configuration_ids":[],"configurations":[...],"engine_version":"0.14.0",
+ "next":"...","path":"/abs/path/work/p2b.project.json",
  "written_sha256":"14090b01fe27afcd61f8a3e111b4e8a9bdf5e726237a2f822a07a88d1176cbe2"},"bounds":{...}}
 ```
 
@@ -156,6 +158,7 @@ os-optics-lens search  [REQUEST_JSON | - | --request FILE | --fixture FILE] [--e
 os-optics-lens compare REF REF ... [--fields K1,K2]          REF = record_id[@configuration_id]
 os-optics-lens inspect RECORD_ID [--revision N] [--configuration ID] [--fields K1,K2]
                        [--sections S1,S2] [--evidence S|PATH#S|all] [--prescription summary|full]
+                       [--provenance]
 os-optics-lens project RECORD_ID [--revision N] [--out FILE [--force] | --stdout]
 os-optics-lens index build    [--corpus DIR] [--out FILE] [--allow-unresolved-evidence]
 os-optics-lens index validate [--corpus DIR] [--allow-unresolved-evidence]
@@ -301,9 +304,10 @@ requires_*?}` of `acceptance/*.json` is accepted verbatim.
 | `--include MATCH,UNCONFIRMED` | `include` |
 | `--hard-shortfall allow` | `hard_shortfall` |
 
-The quick flags cannot pin a sampling grid: to rank a sampled value such as
-`performance.mtf_field_minimum`, write the request with `required_sampled_field_fractions` and
-pass `--request FILE`.
+Quick flags can rank a sampled value such as `performance.mtf_field_minimum` when the eligible
+values share a comparable grid and conditions. To pin a specific grid, set
+`required_sampled_field_fractions` in a JSON target or shorthand preference and pass
+`--request FILE`.
 
 `--fields`, `--detail`, `--limit`, `--cursor` and `--max-output-bytes` also work with a
 single-query document. The flags that build a query cannot be combined with a document.
@@ -315,7 +319,9 @@ echoes the decoded `options.cursor_offset`. It is bounded like the search: by
 `--max-output-bytes`, else the request's `max_output_bytes` (single or batch), else 32768; an
 explanation that does not fit is `OUTPUT_LIMIT_EXCEEDED` (`details.required_bytes`). `--fixture FILE` runs an
 acceptance fixture as `{mode: specification, filters: {record_ids: [record.id]}, constraints,
-preferences: [ranking_preference], evaluation_scope, detail: full}`.
+preferences: [ranking_preference], evaluation_scope, detail: full}`. The Yutong fixture's sensor
+constraint checks geometric coverage. The native P2b Project uses a continuous receiver, so a
+separate constraint for the competition brief's pixel pitch is `UNCONFIRMED`.
 
 ### Batch
 
@@ -431,7 +437,8 @@ a cursor. See [Reader compatibility](INDEX_SCHEMA.md#reader-compatibility).
     weight, unit}`; the target score is the sum of `weight * normalized`.
 - **`unknowns`**: `{constraint | target | preference, reason}`.
 - **`facts`**: `{value, unit, basis}`.
-  - The compact `basis` is the basis class; `detail: full` gives the verbatim basis.
+  - Compact `basis` gives the class (`PROJECT_DECLARED`, `PROJECT_DERIVED`, `ENGINE_COMPUTED`,
+    `DERIVED` or `OTHER`). `detail: full` gives the verbatim basis.
   - A multi-valued fact appears as `{values: n, min, max, unit}`.
 - **`rank.key`** is the exact sort key:
   - specification: `[outcome, preference entries..., record_id, configuration ordinal]`;
@@ -468,8 +475,8 @@ a cursor. See [Reader compatibility](INDEX_SCHEMA.md#reader-compatibility).
 | `fields` | `{records, fields: {key: {records, unit, value_type, bases, condition_variants, conditions_keys, min, max, stop_dependent}}, returned, more}` |
 | `fields --fact` | the key's summary plus `value_paths`, `applicable_ops`, `eligible_for`, `constraint_form`, `variants` (at most 10, `more_variants`), `example_constraint` or `example_filter` |
 | `compare` | `{candidates: [{ref, record_id, revision, configuration_id, title}], rows: [{fact, values: [cell \| null], comparable, differs_by?, missing?, notes?}]}`; `differs_by` may name `sampled_field_fractions`, and then each cell shows its grid (`null` without one); refs must name distinct configurations (`ID` and `ID@<its default configuration>` are the same), and an empty id after `@` is `INVALID_REQUEST` |
-| `inspect` | identity, `collection`, `license`, `design`, `native_project`, `configuration`, `configurations`, `validation`, `facets`, `fact_keys`, `evidence {refs, sections, files}` (scoped, see [Evidence](#evidence)), `next`; plus `fields`, `sections`, `evidence_sections {path: {sha256, sections}}`, `prescription` when asked |
-| `project` | `{record_id, revision, sha256, size_bytes, native_configuration_ids, engine_version, license, attribution, next}`; `--out` adds `path` (absolute) and `written_sha256`. The stored bytes are re-checked against `sha256` before anything is written; `--out` writes a temporary file and replaces the target only after it hashes correctly, and a path that cannot be written is `INVALID_REQUEST` naming it. `--max-output-bytes` is validated before any write and is rejected with `--stdout` |
+| `inspect` | Identity, `collection {collection_id}`, `design`, `native_project`, `configuration`, `configurations`, `facets`, `fact_keys`, supporting `evidence {refs, sections, files}` and `next`. Request Project details with `--fields`, `--sections` or `--prescription`. `--evidence` adds `evidence_sections {path: {sha256, sections}}`. `--provenance` adds `provenance` with the direct source, attribution and license terms. |
+| `project` | `{record_id, revision, sha256, size_bytes, native_configuration_ids, configurations, engine_version, next}`. `--out` adds `path` (absolute) and `written_sha256`. The CLI checks the stored bytes against `sha256` before writing. It writes a temporary file and replaces the target only after the file hashes correctly. An unwritable path returns `INVALID_REQUEST`. `--max-output-bytes` is validated before any write and is rejected with `--stdout`. |
 | `index build` / `validate` | `{out, snapshot_id, records, configurations, facts, warnings, findings, findings_omitted, use}`; `out` and `use` are null for validate |
 | `index dump` | `{index_schema_version, tables: {name: {columns, rows}}}`; not budgeted |
 
@@ -504,12 +511,11 @@ flexible targets, shortfalls and unknowns apart.
 | `CONDITIONS_DIFFER` | no entry has the requested conditions. `details` shows `expected` vs `actual` for the nearest entry, or `present: false` for a member it does not state (spectrum members as `spectrum.<member>`) |
 | `AMBIGUOUS_FACTS` | several entries match. Pin more conditions or use `select` |
 | `DISCOVERY_ONLY` | the fact, or an object along or under the compared path, is discovery-only (e.g. `spectrum.sampling_span_nm`) |
-| `COMPARISON_ONLY` | the path reaches, or the compared object contains, a [provenance check](#provenance-checks): never a value, so it can neither satisfy nor refute a constraint |
+| `COMPARISON_ONLY` | the request explicitly names a [historical source comparison](#provenance-checks) |
 | `COVERAGE_UNCONFIRMED` | `spectrum.continuous_coverage_nm` is not CONFIRMED or SOURCE_STATED |
 | `SAMPLING_DIFFERS` | `required_sampled_field_fractions` differs from the fact's `sampled_field_fractions`, or the fact states none |
-| `SAMPLING_UNSPECIFIED` | (targets and preferences) the value has a sampling grid the request does not pin |
+| `SAMPLING_UNSPECIFIED` | eligible values for an unpinned target or preference have different grids |
 | `STOP_NOT_ELIGIBLE` | a stop-dependent fact on a Project whose stop does not block light |
-| `STOP_MATCH_NOT_SUPPORTED` | a stop-dependent value passes, but the record may not claim a stop-dependent match |
 | `EVIDENCE_MISSING` | evidence is required and the fact (or every method) has no source |
 | `EVIDENCE_UNRESOLVED` | a source exists but does not resolve in the index (file, sha256 or section) |
 | `VALUE_MISSING` | the value at the predicate path is null or absent |
@@ -520,7 +526,7 @@ flexible targets, shortfalls and unknowns apart.
 
 Stop-dependent facts are listed in `vocabulary.json`:
 
-- every `aperture.*` member except `stop_opening_diameter_mm` and `property_list_comparison`;
+- eligible `aperture.*` facts other than `stop_opening_diameter_mm`;
 - `performance.mtf`, `performance.mtf_field_minimum` and `performance.relative_illumination`.
 
 A new aperture member is stop-dependent by default. A predicate that compares a whole object or
@@ -528,14 +534,10 @@ list (path `""` on the `aperture` section, or the whole `performance` list) reac
 stop-dependent fact inside it. For a predicate that reaches a stop-dependent fact, or a constraint
 with `requires_blocking_stop: true`:
 
-1. If `design.aperture_validity.stop_blocks_light` and `eligible_for_stop_dependent_evaluation`
-   are not both true, the result is UNCONFIRMED `STOP_NOT_ELIGIBLE`.
-2. Otherwise the predicate is evaluated. A failure stands as DOES_NOT_MATCH. A pass is a MATCH
-   only when `satisfies_stop_dependent_constraints` is true; otherwise it is UNCONFIRMED
-   `STOP_MATCH_NOT_SUPPORTED`, with the state and satisfaction basis in `details`.
-
-Targets and preferences apply step 1 only. `fields` reports `stop_dependent` per key, and the
-`stop_state` facet shows each record's state.
+The configuration must have a blocking stop. Otherwise the result is `UNCONFIRMED` with reason
+`STOP_NOT_ELIGIBLE`. When the stop is eligible, evaluate the requested fact with its own
+conditions and evidence requirements. Targets and preferences use the same eligibility check.
+`fields` reports `stop_dependent` per key, and the `stop_state` facet shows the Project stop state.
 
 ### Coverage versus discovery span
 
@@ -553,31 +555,23 @@ Targets and preferences apply step 1 only. `fields` reports `stop_dependent` per
 
 ### Provenance checks
 
-`first_order.engine_check`, the `property_list_comparison` of `aperture` and `field`,
-`field.prescription_dump_check`, `materials.catalog_comparisons` and the per-glass
-`catalog_comparison` of `materials.named_glasses` compare source data (see
-[RECORD_FORMAT.md](RECORD_FORMAT.md#provenance-checks)). They are never values:
+`inspect ID --provenance` returns the direct source in `result.provenance`. Depending on the
+record, this includes the source name, input identifier, pinned source revision, source links,
+contributor, attribution and license terms. Use `inspect ID --evidence SECTION` to read the
+supporting calculations and analyses for the Project.
 
-- they are not typed facts; `inspect --fields` shows them under `checks` of the facts they concern
-  (`prescription_dump_check` under every `field.*` fact), and `inspect --sections` shows the
-  section holding them;
-- a constraint reaching one (directly, through a parent object such as the whole `field` section
-  with path `""`, through a nested predicate path, or by a `select`/`conditions` key naming it) is
-  UNCONFIRMED `COMPARISON_ONLY`;
-- naming one as a target, preference (either form), range, summary `fields` entry,
-  `fields --fact`, `compare --fields` or `inspect --fields` is `UNKNOWN_FIELD` with
-  `details.provenance_check` and a hint that it cannot be matched or ranked.
-
-The record's `validation` states (such as `paraxial: MATCHED`) are the record's acceptance
-outcomes, not provenance checks; the `validation` facet exposes them for discovery.
+Historical comparisons such as `first_order.engine_check`, `field.prescription_dump_check` and
+`materials.catalog_comparisons` remain contribution review data. A constraint explicitly naming
+one returns `UNCONFIRMED` with `COMPARISON_ONLY`. A target, preference, range or field naming one
+returns `UNKNOWN_FIELD` with `details.provenance_check`. Whole-section requests use the projected
+Project facts. See the [historical check fields](RECORD_FORMAT.md#provenance-checks).
 
 ### Aperture conventions
 
-These are different facts, and none is derived from or substituted for another:
+Use the Project fact for the aperture convention in your brief.
 
 - an image-space f-number: `aperture.f_number`, `aperture.image_space_f_number`;
-- paraxial working f-numbers: `aperture.paraxial_working_f_number`,
-  `aperture.paraxial_working_f_number_from_dump`;
+- a paraxial working f-number: `aperture.paraxial_working_f_number`;
 - a ray-traced working f-number: `aperture.working_f_number`;
 - an entrance-pupil f-number from EFL and the admitted pupil: `aperture.entrance_pupil_f_number`,
   with a `convention` condition;
@@ -630,18 +624,22 @@ bounds, spectrum, image plane, orientation and so on.
 
 ### Sampling grids
 
-An interval MTF is a minimum over its sampled field positions (`sampled_field_fractions`), so
-minima over different grids are different quantities. The grid is a comparison condition:
+An interval MTF is a minimum over its sampled field positions (`sampled_field_fractions`). The
+ordered grid is part of the comparison because changing the sample positions can change the
+minimum.
 
-- `required_sampled_field_fractions` pins it in a constraint, target or shorthand preference; a
-  different or missing grid is `SAMPLING_DIFFERS`.
-- A target or preference value with a grid that the request does not pin is unknown
-  `SAMPLING_UNSPECIFIED`, so values from different grids are never silently ranked together. The
-  fixture cost form cannot pin a grid; the `--target`/`--prefer` quick flags do not either.
-- `fields` and `fields --fact` list each grid as its own variant, and the example constraint of a
-  sampled fact includes `required_sampled_field_fractions`.
-- `compare` marks rows whose grids differ (including a grid against none)
-  `comparable: false` with `differs_by: ["sampled_field_fractions"]` and shows each cell's grid.
+- `required_sampled_field_fractions` pins an exact grid in a constraint, target or shorthand
+  preference. A different or missing grid yields `SAMPLING_DIFFERS`.
+- A sampled target or preference can rank eligible configurations that share a grid, units,
+  structured conditions and performance qualifiers. Ordered spectra with proportional incident
+  weights can compare under the same conditions. Different unpinned grids yield
+  `SAMPLING_UNSPECIFIED`, including a mix of sampled and unsampled values. Differences in other
+  comparison conditions on a shared grid yield `CONDITIONS_DIFFER`. Search reports these reasons
+  in `unknowns` and omits the affected term from ranking.
+- `fields --fact` shows condition variants and their grids. The example constraint for a sampled
+  fact includes `required_sampled_field_fractions`.
+- `compare` marks rows with different grids `comparable: false`, lists `sampled_field_fractions`
+  in `differs_by` and shows each cell's grid.
 
 ### Evidence
 
@@ -695,8 +693,9 @@ in its view names it.
 
 ### Bases and multi-valued facts
 
-- **Bases.** Each fact carries its `basis`. The class is SOURCE_STATED, DERIVED, ENGINE_COMPUTED
-  or OTHER. A basis is reported and never decides an outcome.
+- **Bases.** `PROJECT_DECLARED` identifies a native Project value. `PROJECT_DERIVED` identifies
+  a value computed from Project data. `ENGINE_COMPUTED` identifies a calculation by `os-optics`.
+  Some applicable analyses retain a legacy `DERIVED` basis.
 - **Multi-valued facts.** A fact key with several entries in one configuration, such as
   `performance.mtf` sampled at several frequencies and heights, is multi-valued.
   - Its summary is `{values, min, max, unit}`.

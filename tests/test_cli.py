@@ -7,6 +7,7 @@ Project hashes, fixture counts) are derived from the committed files, not hard-c
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import errno
 import hashlib
@@ -164,21 +165,27 @@ class EnvelopeTest(unittest.TestCase):
         error = self.assert_error(run_cli("inspect", P2B, "--revision", "999"), "REVISION_NOT_AVAILABLE")
         self.assertEqual(error["details"]["available_revision"], CASE["record"]["revision"])
 
+    def cursor_with(self, **changes: str) -> str:
+        # Start with the CLI's own cursor and change only the field under test.
+        doc = self.assert_ok(run_cli("search", "--mode", "starting_point", "--limit", "1"))
+        cursor = doc["result"]["page"]["next_cursor"]
+        self.assertIsInstance(cursor, str)
+        data = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+        data.update(changes)
+        return base64.urlsafe_b64encode(json.dumps(data).encode("ascii")).rstrip(b"=").decode("ascii")
+
     def test_cursor_from_another_snapshot(self) -> None:
-        explained = self.assert_ok(run_cli("search", "--mode", "starting_point", "--explain-request"))
-        digest = explained["result"]["query_digest"]
-        cursor = output.encode_cursor("0" * 16, digest, 1)
-        error = self.assert_error(run_cli("search", "--mode", "starting_point", "--cursor", cursor),
+        stale = self.cursor_with(s="0" * 16)
+        error = self.assert_error(run_cli("search", "--mode", "starting_point", "--cursor", stale),
                                   "SNAPSHOT_MISMATCH")
         self.assertEqual(error["details"]["snapshot"], SNAPSHOT)
-        mismatch = output.encode_cursor(SNAPSHOT, "f" * 16, 1)
+        mismatch = self.cursor_with(q="f" * 16)
         self.assert_error(run_cli("search", "--mode", "starting_point", "--cursor", mismatch), "CURSOR_MISMATCH")
 
     def test_explain_request_rejects_a_bad_cursor(self) -> None:
-        # --explain-request must not call a continuation fine when the search would refuse it.
         for cursor, code in (("garbage", "CURSOR_INVALID"),
-                             (output.encode_cursor("0" * 16, "f" * 16, 1), "SNAPSHOT_MISMATCH"),
-                             (output.encode_cursor(SNAPSHOT, "f" * 16, 1), "CURSOR_MISMATCH")):
+                             (self.cursor_with(s="0" * 16), "SNAPSHOT_MISMATCH"),
+                             (self.cursor_with(q="f" * 16), "CURSOR_MISMATCH")):
             with self.subTest(code=code):
                 explained = run_cli("search", "--mode", "starting_point", "--explain-request", "--cursor", cursor)
                 searched = run_cli("search", "--mode", "starting_point", "--cursor", cursor)
@@ -186,8 +193,8 @@ class EnvelopeTest(unittest.TestCase):
                 self.assert_error(searched, code)
 
     def test_unsupported_operator_detail_matches_help(self) -> None:
-        error = self.assert_error(run_cli("search", "--mode", "specification", "--where", "aperture.f_number zz 2"),
-                                  "UNSUPPORTED_OPERATOR")
+        error = self.assert_error(run_cli("search", "--mode", "specification", "--where",
+                                          "aperture.stop_opening_diameter_mm zz 2"), "UNSUPPORTED_OPERATOR")
         self.assertIn("lte", error["details"]["supported"])
         row = next(line for line in cli.help_text("errors").decode("ascii").splitlines()
                    if line.startswith("| `UNSUPPORTED_OPERATOR`"))
@@ -301,7 +308,7 @@ class InputEncodingTest(EnvelopeTest):
         self.assertEqual(error["details"]["pointer"], "/mode")
         self.assertIn("duplicate key 'mode'", error["message"])
         request = TMP / "duplicate.json"
-        request.write_bytes(b'{"mode": "specification", "constraints": [{"fact": "aperture.f_number", '
+        request.write_bytes(b'{"mode": "specification", "constraints": [{"fact": "aperture.stop_opening_diameter_mm", '
                             b'"op": "lte", "value": 2, "op": "gte"}]}')
         error = self.assert_error(run_cli("search", "--request", str(request)), "INVALID_REQUEST")
         self.assertEqual(error["details"]["pointer"], "/constraints/0/op")
@@ -403,7 +410,8 @@ class SearchTest(EnvelopeTest):
         request = TMP / "batch-budget.json"
         request.write_text(json.dumps({"max_output_bytes": 4096, "queries": [
             {"mode": "starting_point", "limit": 10},
-            {"mode": "specification", "constraints": [{"fact": "aperture.f_number", "op": "lte", "value": 2.8}]},
+            {"mode": "specification", "constraints": [{"fact": "first_order.effective_focal_length_mm",
+                                                         "op": "lte", "value": 35}]},
             {"mode": "bogus"}]}), encoding="utf-8")
         doc = self.assert_ok(run_cli("search", "--request", str(request)))
         self.assertEqual([entry["ok"] for entry in doc["results"]], [True, True, False])
@@ -416,7 +424,9 @@ class ProjectTest(EnvelopeTest):
         doc = self.assert_ok(run_cli("project", P2B))
         self.assertEqual(doc["result"]["sha256"], native_sha256())
         self.assertEqual(doc["result"]["size_bytes"], len(project_lf_bytes()))
-        self.assertNotIn("path", doc["result"])
+        inspected = self.assert_ok(run_cli("inspect", P2B))
+        self.assertEqual(doc["result"]["configurations"], inspected["result"]["configurations"])
+        self.assertFalse({"path", "license", "attribution", "provenance"} & doc["result"].keys())
 
     def test_out_writes_exact_bytes_and_refuses_overwrite(self) -> None:
         target = TMP / "handoff" / "nested" / "p2b.project.json"

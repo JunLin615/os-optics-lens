@@ -181,6 +181,20 @@ def _corpus_digest(corpus: Corpus) -> str:
     return sha256_text(canonical_json(sorted(rows)))
 
 
+def _record_metadata(record: dict[str, Any]) -> dict[str, Any]:
+    """Identity and direct provenance for inspection, separate from the Project fact view."""
+    result = {key: record[key] for key in ("record_id", "record_revision", "record_schema_version", "record_hash")
+              if key in record}
+    result["native_project"] = {key: record["native_project"][key] for key in ("path", "sha256", "engine_version")
+                                if key in record["native_project"]}
+    collection = record["collection"]
+    result["collection"] = {key: collection[key] for key in (
+        "collection_id", "source", "source_url", "source_input", "source_revision", "source_input_sha256",
+        "source_links", "contributor", "attribution", "original_publication", "redistribution", "license",
+    ) if key in collection}
+    return result
+
+
 def _insert(conn: sqlite3.Connection, corpus: Corpus) -> tuple[int, int]:
     """Insert every non-meta table in sorted order. Returns (configuration count, fact count)."""
     config_pk = 0
@@ -192,7 +206,7 @@ def _insert(conn: sqlite3.Connection, corpus: Corpus) -> tuple[int, int]:
             (record_pk, record.record_id, record.revision, record.schema_version, record.title,
              record.collection_id, record.family_id, record.design_scope, record.record_hash, record.file,
              record.project_path, record.project_sha256, record.engine_version, len(record.views),
-             canonical_json(record.record)),
+             canonical_json(_record_metadata(record.record))),
         )
         conn.execute(
             "INSERT INTO projects VALUES (?,?,?,?)",

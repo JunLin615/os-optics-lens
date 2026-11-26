@@ -64,6 +64,7 @@ __all__ = [
     "target_deviation",
     "preference_value",
     "preference_rank_entry",
+    "ranking_conditions_equal",
 ]
 
 MATCH = "MATCH"
@@ -282,6 +283,15 @@ def canonical_value(value: object) -> object:
     return value
 
 
+def public_fact_value(value: object) -> Any:
+    """Project fact data without references reserved for explicit evidence checks."""
+    if isinstance(value, dict):
+        return {key: public_fact_value(item) for key, item in value.items() if key != "source"}
+    if isinstance(value, list):
+        return [public_fact_value(item) for item in value]
+    return value
+
+
 def _canonical_text(value: object) -> str:
     return json.dumps(canonical_value(value), sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False)
@@ -364,7 +374,7 @@ def _condition_differences(own: object, key: str, expected: object) -> list[tupl
     unpinned); mismatches are then listed as `spectrum.<member>`."""
     if not isinstance(own, dict) or key not in own:
         return [(key, {"expected": expected, "present": False})]
-    actual = own[key]
+    actual = public_fact_value(own[key])
     if key == "spectrum" and isinstance(expected, dict):
         if not isinstance(actual, dict):
             return [(key, {"expected": expected, "actual": actual})]
@@ -397,7 +407,7 @@ def stop_status(view: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "eligible": validity.get("stop_blocks_light") is True
         and validity.get("eligible_for_stop_dependent_evaluation") is True,
-        "satisfies": validity.get("satisfies_stop_dependent_constraints") is True,
+        "satisfies": validity.get("satisfies_stop_dependent_constraints") is not False,
         "state": validity.get("state"),
         "satisfaction_basis": validity.get("satisfaction_basis"),
     }
@@ -454,6 +464,14 @@ def _not_fact_hit(segments: Sequence[str], base: str = "") -> dict[str, Any] | N
                             "cannot satisfy or refute a constraint",
                     "hint": "constrain the fact itself (see `fields`)"}
     return None
+
+
+def _source_path_hit(segments: Sequence[str], base: str = "") -> dict[str, Any] | None:
+    if "source" not in segments:
+        return None
+    path = ".".join(segments[:segments.index("source") + 1])
+    return {"json_path": f"{base}.{path}" if base else path, "member": "source",
+            "hint": "Use has_source, has_sourced_method or requires_evidence_source to check supporting evidence."}
 
 
 def _contained_hit(node: object, base: str) -> tuple[str, dict[str, Any]] | None:
@@ -513,7 +531,8 @@ def _metric_entries(view: object, scope: Sequence[str], metric: str,
                if isinstance(e, dict) and json_equal(e.get("metric"), metric)]
     if select:
         entries = [(i, e) for i, e in entries
-                   if all(k in e and json_equal(e[k], v) for k, v in select.items())]
+                   if all(k != "source" and k in e and json_equal(public_fact_value(e[k]), v)
+                          for k, v in select.items())]
     return entries
 
 
@@ -863,7 +882,10 @@ def expand_for_view(constraint: Mapping[str, Any], view: Mapping[str, Any], *,
     else:
         parent = _at(view, segments[:-1])
         leaf = segments[-1]
-        if isinstance(parent, dict) and leaf in parent and isinstance(parent[leaf], dict):
+        if op == "has_source" and leaf == "source" and explicit is None:
+            out["scope"] = segments[:-1]
+            path = leaf
+        elif isinstance(parent, dict) and leaf in parent and isinstance(parent[leaf], dict):
             out["scope"] = segments
             if explicit is not None:
                 path = explicit
@@ -991,7 +1013,7 @@ def _ambiguity_details(candidates: Sequence[tuple[str, Any]]) -> dict[str, Any]:
             continue
         seen: dict[str, Any] = {}
         for _, fact in candidates:
-            value = fact.get(key) if isinstance(fact, dict) else None
+            value = public_fact_value(fact.get(key)) if isinstance(fact, dict) else None
             seen.setdefault(_canonical_text(value), value)
         if len(seen) > 1:
             distinguishing[key] = list(seen.values())[:10]
@@ -1032,10 +1054,23 @@ def _sampling_differs(fact: object, required: object) -> dict[str, Any] | None:
     return {"expected": required, "actual": fact[_SAMPLING_MEMBER]}
 
 
+def _ranking_fact(fact: object, path: str) -> object:
+    """Find the nearest object declaring the grid for the numeric member at path."""
+    owner = node = fact
+    for segment in _split(path):
+        node = node.get(segment) if isinstance(node, dict) else None
+        if _sampling_grid(node) is not None:
+            owner = node
+    return owner
+
+
 def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
-            sampling_and_evidence: bool) -> _Located:
-    """Steps 1-6 of §6.2 (stop eligibility, scope, comparability, discovery-only, sampling,
-    evidence). Satisfaction (10.1 b) is applied by the caller."""
+            sampling_and_evidence: bool, ranking_path: str | None = None) -> _Located:
+    """Apply stop eligibility, scope, comparability, discovery-only, sampling and evidence.
+
+    Ranking uses a requested grid to narrow entries before checking for ambiguity. The caller
+    applies the stop satisfaction policy and validates the selected value.
+    """
     scope: list[str] = list(c["scope"])
     metric = c.get("metric")
     key_segments = scope + ([metric] if metric is not None else [])
@@ -1043,11 +1078,18 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
     required = bool(c.get("requires_blocking_stop")) or \
         _prefix_stop_dependent(key_segments, ctx) is not None
     located = _Located(key_segments=key_segments, gate_required=required, stop=stop)
-    # Narrowing by a provenance check (select/conditions member) would let that data decide which
-    # fact is compared, so it is guarded like a path naming the check.
-    not_fact = (_not_fact_hit(key_segments)
-                or _not_fact_hit(list(c.get("select") or {}), "select")
-                or _not_fact_hit(list(c.get("conditions") or {}), "conditions"))
+    # Selectors cannot use evidence references or intake checks to choose the compared fact.
+    select_keys = list(c.get("select") or {})
+    condition_keys = list(c.get("conditions") or {})
+    not_fact = (_not_fact_hit(key_segments) or _source_path_hit(key_segments)
+                or _not_fact_hit(select_keys, "select") or _not_fact_hit(condition_keys, "conditions"))
+    if not_fact is None and "source" in select_keys:
+        not_fact = _source_path_hit(["source"], "select")
+    if not_fact is None and "source" in condition_keys:
+        not_fact = _source_path_hit(["source"], "conditions")
+    predicates = c.get("predicates") or ()
+    if not_fact is None and len(predicates) == 1:
+        not_fact = _not_fact_hit(_split(predicates[0].get("path", "")), ".".join(key_segments))
     if not_fact is not None:
         located.reason, located.details = COMPARISON_ONLY, not_fact
         return located
@@ -1076,7 +1118,8 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
                     seen: dict[str, Any] = {}
                     for _, entry in entries:
                         if key in entry:
-                            seen.setdefault(_canonical_text(entry[key]), entry[key])
+                            member = public_fact_value(entry[key])
+                            seen.setdefault(_canonical_text(member), member)
                     available[key] = {"expected": select[key], "available": list(seen.values())[:10]}
                     if not seen:
                         available[key]["present"] = False
@@ -1106,6 +1149,17 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
         located.reason = CONDITIONS_DIFFER
         located.details = _nearest_condition_details(candidates, conditions)
         return located
+    if len(comparable) > 1 and ranking_path is not None and "required_sampled_field_fractions" in c:
+        required_grid = c["required_sampled_field_fractions"]
+        grid_matches = [
+            (path, fact) for path, fact in comparable
+            if _sampling_differs(_ranking_fact(fact, ranking_path), required_grid) is None
+        ]
+        if not grid_matches:
+            located.reason = SAMPLING_DIFFERS
+            located.details = _sampling_differs(_ranking_fact(comparable[0][1], ranking_path), required_grid)
+            return located
+        comparable = grid_matches
     if len(comparable) > 1:
         located.reason = AMBIGUOUS_FACTS
         located.details = _ambiguity_details(comparable)
@@ -1126,15 +1180,14 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
         located.reason, located.details = DISCOVERY_ONLY, hit
         return located
 
-    if not sampling_and_evidence:
-        return located
     fact = located.fact
     if "required_sampled_field_fractions" in c:
-        differs = _sampling_differs(fact, c["required_sampled_field_fractions"])
+        owner = _ranking_fact(fact, ranking_path) if ranking_path is not None else fact
+        differs = _sampling_differs(owner, c["required_sampled_field_fractions"])
         if differs is not None:
             located.reason, located.details = SAMPLING_DIFFERS, differs
             return located
-    if c.get("requires_evidence_source"):
+    if sampling_and_evidence and c.get("requires_evidence_source"):
         source = fact.get("source") if isinstance(fact, dict) else None
         status = ctx.source_status(source)
         if status != RESOLVED:
@@ -1178,7 +1231,7 @@ def _coverage_guard(view: Mapping[str, Any], full: Sequence[str]) -> dict[str, A
 
 
 def _path_guards(view: Mapping[str, Any], located: _Located, segments: Sequence[str],
-                 ctx: EvalContext) -> tuple[str | None, dict[str, Any] | None, bool]:
+                 ctx: EvalContext, *, op: str | None = None) -> tuple[str | None, dict[str, Any] | None, bool]:
     """Amendment 10.2 guards for one predicate path: returns (reason, details, stop_gated).
 
     Besides the path itself, the value the path ends at is checked as a whole: a predicate that
@@ -1187,6 +1240,8 @@ def _path_guards(view: Mapping[str, Any], located: _Located, segments: Sequence[
     contained member."""
     full = located.key_segments + list(segments)
     not_fact = _not_fact_hit(segments, located.json_path)
+    if not (op == "has_source" and segments and segments[-1] == "source" and "source" not in segments[:-1]):
+        not_fact = not_fact or _source_path_hit(segments, located.json_path)
     if not_fact is not None:
         return COMPARISON_ONLY, not_fact, False
     target: object = located.fact
@@ -1266,12 +1321,14 @@ def _evaluate_predicate(view: Mapping[str, Any], located: _Located, predicate: M
     expected = predicate.get("value", True)
     segments = _split(path)
     result = _PredicateResult(UNCONFIRMED, path, op)
-    reason, details, gated = _path_guards(view, located, segments, ctx)
+    reason, details, gated = _path_guards(view, located, segments, ctx, op=op)
     if reason is not None:
         result.reason, result.details = reason, details
         return result
     value = _at(located.fact, segments) if segments else located.fact
-    result.value = value
+    if op not in _SOURCE_OPS:
+        value = public_fact_value(value)
+    result.value = public_fact_value(value) if op == "has_sourced_method" else value
     json_path = f"{located.json_path}.{path}" if path else located.json_path
     if value is None:
         result.reason = VALUE_MISSING
@@ -1416,7 +1473,7 @@ def _basis(view: Mapping[str, Any], located: _Located, segments: Sequence[str]) 
 
 
 def _fact_info(view: Mapping[str, Any], located: _Located, results: Sequence[_PredicateResult],
-               ctx: EvalContext) -> dict[str, Any]:
+               ctx: EvalContext, *, include_source: bool) -> dict[str, Any]:
     fact = located.fact
     first = _split(results[0].path) if results else []
     info: dict[str, Any] = {"json_path": located.json_path}
@@ -1430,11 +1487,11 @@ def _fact_info(view: Mapping[str, Any], located: _Located, results: Sequence[_Pr
         if _sampling_grid(fact) is not None:
             info[_SAMPLING_MEMBER] = fact[_SAMPLING_MEMBER]
         if isinstance(fact.get("conditions"), dict):
-            info["conditions"] = fact["conditions"]
+            info["conditions"] = public_fact_value(fact["conditions"])
         elif isinstance(fact.get("conditions"), str):
             info["conditions_text"] = fact["conditions"]
         source = fact.get("source")
-        if source is not None:
+        if include_source and source is not None:
             info["source"] = {
                 "path": source.get("path") if isinstance(source, dict) else None,
                 "section": source.get("section") if isinstance(source, dict) else None,
@@ -1450,7 +1507,7 @@ def _unpinned(fact: object, constraint: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(fact, dict):
         return {}
     conditions = constraint.get("conditions") or {}
-    own = fact.get("conditions")
+    own = public_fact_value(fact.get("conditions"))
     items: list[tuple[str, Any]] = []
     if isinstance(own, str):
         items.append(("_text", _short(own)))
@@ -1525,7 +1582,8 @@ def evaluate_constraint(view: Mapping[str, Any], constraint: Mapping[str, Any], 
         if unpinned:
             out["unpinned"] = unpinned
     if detail:
-        out["fact"] = _fact_info(view, located, results, ctx)
+        include_source = bool(c.get("requires_evidence_source")) or any(r.op in _SOURCE_OPS for r in results)
+        out["fact"] = _fact_info(view, located, results, ctx, include_source=include_source)
         out["predicates"] = [
             {k: v for k, v in (("path", r.path), ("op", r.op), ("outcome", r.outcome),
                                ("reason", r.reason), ("value", r.value)) if v is not None or k == "value"}
@@ -1569,11 +1627,18 @@ def configuration_rank(evaluation: Mapping[str, Any], ordinal: int) -> tuple[int
 # Targets and preferences (§6.5, amendment 10.9)
 
 
-def _unspecified_grid(fact: object) -> dict[str, Any]:
-    """SAMPLING_UNSPECIFIED details: a sampled value is comparable only on a stated grid, so
-    values from different grids are never ranked together silently."""
-    return {"actual": _sampling_grid(fact),
-            "hint": "pin required_sampled_field_fractions in the target or shorthand preference"}
+def ranking_conditions_equal(actual: object, expected: object) -> bool:
+    """Compare full structured ranking conditions, including incident weights by ratio."""
+    if json_equal(actual, expected):
+        return True
+    if not isinstance(actual, dict) or not isinstance(expected, dict) or actual.keys() != expected.keys():
+        return False
+    actual_spectrum, expected_spectrum = actual.get("spectrum"), expected.get("spectrum")
+    if not isinstance(actual_spectrum, dict) or not isinstance(expected_spectrum, dict):
+        return False
+    return (actual_spectrum.keys() == expected_spectrum.keys()
+            and "sampling_wavelengths_nm" in expected_spectrum
+            and _conditions_match(actual, expected))
 
 
 def _single_numeric(view: Mapping[str, Any], spec: Mapping[str, Any], ctx: EvalContext,
@@ -1581,30 +1646,37 @@ def _single_numeric(view: Mapping[str, Any], spec: Mapping[str, Any], ctx: EvalC
     """Steps 1-6 with eligibility only, then exactly one comparable finite number."""
     shorthand: dict[str, Any] = {"id": spec.get("id") or "t", "fact": spec["fact"], "op": "near",
                                  "value": spec.get("target")}
-    for key in ("path", "conditions", "select"):
+    for key in ("path", "conditions", "select", "required_sampled_field_fractions"):
         if key in spec:
             shorthand[key] = spec[key]
+    fact_parts = spec["fact"].split(".")
+    default_metric_path = fact_parts[0] == "performance" and len(fact_parts) == 2 and "path" not in spec
+    if default_metric_path:
+        shorthand["path"] = ""
     try:
         c = expand_for_view(shorthand, view, pointer=pointer)
+        path = c["predicates"][0]["path"]
+        located = _locate(view, c, ctx, sampling_and_evidence=False, ranking_path=path)
+        if default_metric_path and located.reason is None:
+            path = _default_member([located.fact], spec["fact"], pointer)
     except RequestError as error:
         raise RequestError("INVALID_REQUEST", f"{spec['fact']} is an interval and cannot be ranked "
                            "as one value", pointer=pointer, hint=error.hint,
                            details=error.details) from None
-    located = _locate(view, c, ctx, sampling_and_evidence=False)
     info: dict[str, Any] = {"fact": spec["fact"]}
     if located.reason is not None:
         if located.details:
             info["details"] = located.details
         return None, located.reason, info
-    if "required_sampled_field_fractions" in spec:
-        differs = _sampling_differs(located.fact, spec["required_sampled_field_fractions"])
-        if differs is not None:
-            info["details"] = differs
-            return None, SAMPLING_DIFFERS, info
-    elif _sampling_grid(located.fact) is not None:
-        info["details"] = _unspecified_grid(located.fact)
-        return None, SAMPLING_UNSPECIFIED, info
-    path = c["predicates"][0]["path"]
+    owner = _ranking_fact(located.fact, path)
+    info["sampled_field_fractions"] = _sampling_grid(owner)
+    conditions = owner.get("conditions") if isinstance(owner, dict) else None
+    if conditions is None and isinstance(located.fact, dict):
+        conditions = located.fact.get("conditions")
+    if conditions is None and isinstance(owner, dict):
+        conditions = owner.get("condition")
+    info["conditions"] = public_fact_value(conditions) if isinstance(conditions, (dict, str)) else None
+    info["value_member"] = path
     segments = _split(path)
     reason, details, _ = _path_guards(view, located, segments, ctx)
     if reason is not None:
@@ -1622,7 +1694,7 @@ def _single_numeric(view: Mapping[str, Any], spec: Mapping[str, Any], ctx: EvalC
                            "as one value", pointer=pointer,
                            hint=f"give path {pair[0]} or {pair[1]}", details={"fact": spec["fact"]})
     if not _is_number(value):
-        info["details"] = {"expected": "number", "actual": _short(value)}
+        info["details"] = {"expected": "number", "actual": _short(public_fact_value(value))}
         return None, VALUE_TYPE, info
     return value, None, info
 
@@ -1633,8 +1705,9 @@ def target_value(view: Mapping[str, Any], target: Mapping[str, Any], ctx: EvalCo
 
     Resolution follows §6.2 steps 1-6 with stop *eligibility* only (no satisfaction gate) and the
     10.3 shorthand expansion; the target needs exactly one comparable finite number. Returns
-    `(value, None, info)` or `(None, reason, info)`; `info` carries `fact`, `json_path`, `unit`,
-    `basis` and, for an unknown, `details`. Interval facts raise `RequestError` INVALID_REQUEST.
+    `(value, None, info)` or `(None, reason, info)`. The value's grid and structured conditions in
+    `info` let the query check comparability across configurations. Interval facts raise
+    `RequestError` INVALID_REQUEST.
     """
     return _single_numeric(view, target, ctx, pointer)
 
@@ -1731,11 +1804,11 @@ def preference_value(view: Mapping[str, Any], preference: Mapping[str, Any], ctx
     if differs:
         info["details"] = {"differs": differs}
         return None, PREFERENCE_NOT_COMPARABLE, info
-    if _sampling_grid(obj) is not None:
-        # The fixture form cannot pin a grid, so a sampled value is never ranked by it.
-        info["details"] = _unspecified_grid(obj)
-        return None, SAMPLING_UNSPECIFIED, info
     value = obj.get(metric)
+    info["sampled_field_fractions"] = _sampling_grid(obj)
+    conditions = obj.get("conditions")
+    info["conditions"] = conditions if isinstance(conditions, dict) else None
+    info["value_member"] = metric
     info["unit"] = unit_for_name(metric)
     info["basis"] = obj.get("basis") if isinstance(obj.get("basis"), str) else None
     if value is None:

@@ -23,7 +23,9 @@ Steps (each one is a check in the JSON report printed on stdout):
    ``network_blocked`` (probe), ``import_location`` (the package imports from the venv, not the
    checkout), ``info`` (console script), ``python_m_info`` (``python -m os_optics_lens``, same
    snapshot), ``facets``, ``search`` (a starting-point request read from a file),
-   ``inspect`` (``yutong-2025-mirrorless-18-p2b``, ASCII JSON on the piped stdout), ``project_out``
+   ``inspect`` (``yutong-2025-mirrorless-18-p2b``, ASCII JSON on the piped stdout),
+   ``inspect_without_provenance`` (LensLibrary Project first-order facts) and ``inspect_provenance``
+   (the same record's direct source, attribution and redistribution terms), ``project_out``
    (``project --out``; the file's SHA-256 equals the record's ``native_project.sha256``),
    ``inspect_evidence`` (``inspect --evidence back_focus`` of the same record returns that section
    of its bundled evidence extract, with every evidence reference RESOLVED),
@@ -59,6 +61,7 @@ PACKAGE = "os_optics_lens"
 DATA = f"{PACKAGE}/_data"
 CORPUS = f"{DATA}/corpus"
 INSPECT_RECORD = "yutong-2025-mirrorless-18-p2b"
+PROVENANCE_RECORD = "lenslibrary-528155"
 FIXTURE = "acceptance/yutong-2025-mirrorless-problem-2.json"
 EVIDENCE_PATH = f"records/yutong-cup/{INSPECT_RECORD}/evidence.json"
 EVIDENCE_SECTION = "back_focus"
@@ -363,6 +366,14 @@ def check_wheel_contents(report: Report) -> dict[str, Any]:
             if record.get("record_id") == INSPECT_RECORD:
                 facts["inspect_project_sha256"] = record["native_project"]["sha256"]
                 facts["inspect_revision"] = record.get("record_revision")
+            if record.get("record_id") == PROVENANCE_RECORD:
+                collection = record["collection"]
+                facts["direct_source"] = {
+                    key: collection[key]
+                    for key in ("source", "source_input", "source_revision", "attribution")
+                }
+                facts["redistribution"] = collection["redistribution"]
+                facts["paraxial_efl_mm"] = record["first_order"]["engine_check"]["effective_focal_length_mm"]
         fixture = f"{CORPUS}/{FIXTURE}"
         if fixture not in names:
             check.fail(f"{fixture} is missing")
@@ -374,6 +385,8 @@ def check_wheel_contents(report: Report) -> dict[str, Any]:
                 check.fail(f"*.dist-info/licenses/{license_file} is missing")
         if "inspect_project_sha256" not in facts:
             check.fail(f"record {INSPECT_RECORD} is not bundled")
+        if "direct_source" not in facts:
+            check.fail(f"record {PROVENANCE_RECORD} is not bundled")
         check.info.update({
             "wheel_bytes": report.wheel.stat().st_size,
             "entries": len(names),
@@ -513,9 +526,53 @@ def run_installed_checks(report: Report, run_dir: Path, venv: Path, facts: dict[
         check.fail(f"inspect reports revision {revision!r}, the bundled record has {facts['inspect_revision']!r}")
     check.ok = True
 
+    check = report.start("inspect_without_provenance")
+    doc = runner.json_command(check, [cli, "inspect", PROVENANCE_RECORD, "--fields", "first_order",
+                                      "--sections", "first_order"])
+    result = doc.get("result") if isinstance(doc, dict) else None
+    if not isinstance(result, dict) or result.get("record_id") != PROVENANCE_RECORD:
+        check.fail(f"inspect does not report record_id {PROVENANCE_RECORD}")
+    else:
+        collection = result.get("collection")
+        if collection != {"collection_id": "lenslibrary"}:
+            check.fail("ordinary inspect must report only the collection ID in collection")
+        first_order = (result.get("sections") or {}).get("first_order") or {}
+        efl = first_order.get("effective_focal_length_mm") or {}
+        if efl.get("basis") != "ENGINE_COMPUTED" or efl.get("value") != facts["paraxial_efl_mm"]:
+            check.fail("ordinary inspect does not report the Project's engine-computed focal length")
+        hidden = {"provenance", "license", "attribution", "redistribution", "conversion", "validation",
+                  "source_input", "source_revision", "source_links", "source_reference", "original_publication",
+                  "checks", "engine_check", "property_list_comparison", "prescription_dump_check"}
+        payload = {key: value for key, value in result.items() if key != "next"}
+        leaked = sorted({key for key, _ in walk(payload)} & hidden)
+        if leaked:
+            check.fail(f"ordinary inspect exposes provenance or intake keys: {leaked}")
+    check.ok = True
+
+    check = report.start("inspect_provenance")
+    doc = runner.json_command(check, [cli, "inspect", PROVENANCE_RECORD, "--provenance"])
+    result = doc.get("result") if isinstance(doc, dict) else None
+    if not isinstance(result, dict) or result.get("record_id") != PROVENANCE_RECORD:
+        check.fail(f"inspect --provenance does not report record_id {PROVENANCE_RECORD}")
+    else:
+        provenance = result.get("provenance")
+        if not isinstance(provenance, dict):
+            check.fail("inspect --provenance returns no provenance object")
+        else:
+            for key, expected in facts["direct_source"].items():
+                if provenance.get(key) != expected:
+                    check.fail(f"inspect --provenance {key} does not match the bundled record")
+            license_info = provenance.get("license")
+            if not isinstance(license_info, dict) or license_info.get("redistribution") != facts["redistribution"]:
+                check.fail("inspect --provenance license.redistribution does not match the bundled record")
+    check.ok = True
+
     check = report.start("project_out")
     target = run_dir / "handoff" / f"{INSPECT_RECORD}.project.json"
     doc = runner.json_command(check, [cli, "project", INSPECT_RECORD, "--out", str(target)])
+    result = doc.get("result") if isinstance(doc, dict) else None
+    if isinstance(result, dict) and {"provenance", "license", "attribution"} & result.keys():
+        check.fail("project handoff exposes provenance")
     expected = facts.get("inspect_project_sha256")
     if not target.is_file():
         check.fail(f"project --out did not write {target}")
@@ -629,8 +686,8 @@ def main(argv: list[str] | None = None) -> int:
             f"create {scratch}/verify-*/venv with {'uv venv' if uv else 'python -m venv'} ({args.python})",
             "install the wheel with --no-index --no-deps",
             "run network_blocked, import_location, info, python_m_info, facets, search, inspect, "
-            "project_out, inspect_evidence, search_fixture, index_rebuild from an empty directory with "
-            "sockets disabled",
+            "inspect_without_provenance, inspect_provenance, project_out, inspect_evidence, search_fixture, "
+            "index_rebuild from an empty directory with sockets disabled",
         ]
     elif report.ok:
         scratch.mkdir(parents=True, exist_ok=True)

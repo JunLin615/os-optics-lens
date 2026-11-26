@@ -23,7 +23,6 @@ replacing spaces and hyphens with underscores, and accept aliases.
 | `module_role` | record | where a phone module sits in its device (design.module_role): main_camera, ultrawide, telephoto, front_camera; not what the prescription is. Another record value is indexed verbatim (UNKNOWN_TERM) and filters match it exactly |
 | `stop_state` | record | stop_blocking, stop_not_blocking or no_stop (design.aperture_validity.state) |
 | `evidence` | configuration | performance metrics and studies present (mtf, mtf_field_minimum, cra, relative_illumination, tolerance_study, ...) |
-| `validation` | record | paraxial_matched, field_verified, project_accepted |
 
 Configuration-level facets are checked per configuration; record-level facets apply to every
 configuration of the record.

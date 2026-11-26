@@ -53,10 +53,9 @@ Interval facts (min_/max_ members, e.g. `performance.distortion_range`) need `pa
 
 ## Basis and conditions
 
-`basis` is the fact's own basis or the nearest applicable one; its class is SOURCE_STATED,
-DERIVED, ENGINE_COMPUTED or OTHER. Structured `conditions` are comparison keys; prose
-conditions (`conditions_text`) are information only. `compare` marks rows whose units,
+`basis` is the fact's own basis or the nearest applicable one. Its class can be
+`PROJECT_DECLARED`, `PROJECT_DERIVED`, `ENGINE_COMPUTED`, `DERIVED` or `OTHER`. Structured
+`conditions` are comparison keys. Prose conditions (`conditions_text`) describe the value. `compare` marks rows whose units,
 conditions, qualifiers or sampling grids differ as `comparable: false` with `differs_by`.
-Provenance checks (`engine_check`, `property_list_comparison`, `field.prescription_dump_check`,
-`materials.catalog_comparisons`, a named glass's `catalog_comparison`) are not facts
-(`help semantics`).
+Field discovery uses the Project's own optical values and applicable analysis results.
+Use `inspect ID --provenance` for the record's direct source and attribution.

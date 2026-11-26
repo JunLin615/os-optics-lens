@@ -57,7 +57,7 @@ Use the contributor's account of the input used to make the Project. A library c
 that library, the input identifier, its revision or edition when available, and applicable
 attribution and redistribution terms. For a direct patent transcription, identify the publication
 and example. For an original submission, name the contributor and the terms of the contribution.
-These details are available on explicit request. The source's own references can stay upstream.
+Use `os-optics-lens inspect ID --provenance` to read these details. The source's own references can stay upstream.
 
 Existing fields such as `collection.source_revision`, `collection.source_input_sha256`,
 `collection.source_links`, `collection.original_publication` and `design.source_reference` can be
@@ -75,7 +75,9 @@ common bases.
 
 | Basis | Meaning |
 |---|---|
-| `DERIVED` | Computed from other values. The derivation must use the committed Project or results for it for the output to be a search fact. |
+| `PROJECT_DECLARED` | Declared in the native Project. |
+| `PROJECT_DERIVED` | Computed from the committed Project or results for it. |
+| `DERIVED` | Legacy label for a derived value. Eligibility depends on its documented Project basis. |
 | `ENGINE_COMPUTED` | Produced by `os-optics` for the committed Project. |
 | `SOURCE_STATED` | Written in the direct source and retained as provenance or transcription evidence. A source label may inform a discovery facet. |
 
@@ -95,15 +97,11 @@ interpret it. Source targets and side-by-side numerical comparisons belong to co
 - `wavelength_precision` — states that these are computational values at full precision, so a
   reviewer may pass them to the engine unchanged; rounding in this document or in prose is for
   display only.
-- `sampling_span_nm` — the numeric span of the sampling wavelengths, **eligible for discovery only**.
-  It is not a coverage claim and not an operating range. Two `basis` values occur:
-  - `SPAN_OF_STATED_SAMPLING_WAVELENGTHS` — the min and max of several enabled wavelengths. The span
-    is a summary of the samples; the samples themselves are `sampling_wavelengths_nm`.
-  - `SINGLE_WAVELENGTH_BAND` — **ten records** enable exactly one wavelength. A zero-width interval
-    cannot be filtered or evaluated, so the span is a **±0.5 nm window around that one sample**
-    (1 nm wide). It is a numerical convenience, not a second wavelength: `sampling_wavelengths_nm`
-    still holds exactly one value, and the window must never be read as two observed samples or as
-    a measured band. Only `sampling_wavelengths_nm` is observed.
+- `sampling_span_nm` gives the minimum and maximum of the sampled wavelengths for discovery.
+  The bounds coincide for a Project with one sample. The legacy seed records retain
+  `SPAN_OF_STATED_SAMPLING_WAVELENGTHS` and `SINGLE_WAVELENGTH_BAND` labels. The latter used a
+  synthetic ±0.5 nm window for a single sample. The native sampling wavelengths determine the
+  retrieval span where the Project supplies them.
 - `continuous_coverage_nm` — **the only interval that can satisfy a hard band constraint.** Its
   `state` is `UNCONFIRMED` with null bounds until there is evidence for the range on the Project.
   A hard coverage constraint remains unconfirmed when the record supplies only discrete samples or
@@ -188,11 +186,10 @@ documented here for the contract's sake and does not occur in the data. The prop
 `property_list_comparison` only. A record with no stated aperture leaves every system-aperture field
 out rather than inferring one.
 
-### Dump-derived f-number facts
+### Historical dump f-number entries
 
-The dump prints several f-number conventions side by side. Each is kept as its own fact with
-`system_aperture: false` and a `source_locator` naming where it came from, and is **never** merged
-into the system-aperture value:
+The dump prints several f-number conventions side by side. The seed records preserve them for
+review with `system_aperture: false` and a `source_locator` naming the original entry.
 
 | Field | Meaning |
 |---|---|
@@ -251,10 +248,9 @@ A missing value is left out. An unknown field leaves the field constraint unconf
 
 ## Provenance checks
 
-These members compare source data. They are kept for review, are never values, and the retriever
-neither matches nor ranks them (they are not typed facts; a constraint reaching one is
-UNCONFIRMED `COMPARISON_ONLY`, and naming one as a target, preference, range or field is an
-error):
+These legacy members hold source comparisons for contribution review. A constraint naming one
+reports `UNCONFIRMED` with `COMPARISON_ONLY`. A target, preference, range or field naming one
+reports `UNKNOWN_FIELD`. Whole-section requests use the projected Project facts.
 
 | member | compares |
 |---|---|
@@ -384,7 +380,8 @@ support for each searchable Project fact. A source comparison is useful for spot
 errors. Resolve any issue it reveals with the Project or its advertised facts during intake.
 
 Keep detailed checks and source discrepancies with the contribution. Routine retrieval reports
-confidence in the requested Project facts through their conditions and match states.
+confidence in the requested Project facts through their conditions and match states. The legacy
+`validation` verdicts are contribution metadata.
 
 ## Batch manifest
 
@@ -439,12 +436,9 @@ Any other key is `INVALID_FIELD`.
 
 ### Configuration view
 
-Each entry defines a configuration view:
-
-- the record is copied without `configurations`;
-- every section the entry contains **replaces** the top-level section of the same name, and is
-  never merged into it; an entry's `conjugate` replaces `design.conjugate`;
-- the view also carries `configuration = {configuration_id, label, native: true}`.
+Each entry defines a configuration view. Its section **replaces** the top-level section of the
+same name. An entry's `conjugate` replaces `design.conjugate`. The index projects each view onto
+eligible Project facts and attaches `configuration = {configuration_id, label, native: true}`.
 
 Every constraint of a query is evaluated against one view. A record never matches because
 different configurations satisfy different constraints.

@@ -34,12 +34,11 @@ verify.
 | `CONDITIONS_DIFFER` | no entry has the requested conditions (`details` shows `expected` vs `actual`, or `present: false` for a member the fact does not state) | relax or change `conditions`, or inspect the record |
 | `AMBIGUOUS_FACTS` | more than one entry matches the conditions | pin more conditions or use `select` |
 | `DISCOVERY_ONLY` | the fact is a discovery label (e.g. `spectrum.sampling_span_nm`) | constrain a confirmed fact instead |
-| `COMPARISON_ONLY` | the path reaches (or the compared object contains) a provenance check: `property_list_comparison`, `engine_check`, `prescription_dump_check`, `catalog_comparisons`, `catalog_comparison`; never a value | constrain the fact itself |
+| `COMPARISON_ONLY` | the request explicitly names a historical source comparison such as `property_list_comparison` or `engine_check` | constrain a Project fact |
 | `COVERAGE_UNCONFIRMED` | continuous spectral coverage is not established | treat coverage as open |
 | `SAMPLING_DIFFERS` | the sampled field fractions differ from `required_sampled_field_fractions` (or the fact states none) | inspect the samples |
-| `SAMPLING_UNSPECIFIED` | a target or preference value has a sampling grid that the request does not pin | add `required_sampled_field_fractions` to the target or preference (see `fields --fact`) |
+| `SAMPLING_UNSPECIFIED` | eligible values for an unpinned target or preference have different grids | pin `required_sampled_field_fractions` or narrow the search |
 | `STOP_NOT_ELIGIBLE` | stop-dependent fact, but the Project's stop does not block light | evaluate the Project with a real stop |
-| `STOP_MATCH_NOT_SUPPORTED` | stop-dependent value passes, but the record may not claim a stop-dependent match | verify with os-optics |
 | `EVIDENCE_MISSING` | evidence is required but the fact has no source | treat as unverified |
 | `EVIDENCE_UNRESOLVED` | the source does not resolve in the index (file, hash or section) | treat as unverified |
 | `VALUE_MISSING` | the value at the predicate path is null or absent | check `path` |
@@ -54,12 +53,10 @@ plus `performance.mtf`, `performance.mtf_field_minimum` and `performance.relativ
 whole `performance` list) reaches every stop-dependent fact inside it. For a stop-dependent
 constraint (or one with `requires_blocking_stop: true`):
 
-1. if `design.aperture_validity` does not have both `stop_blocks_light` and
-   `eligible_for_stop_dependent_evaluation` true: UNCONFIRMED `STOP_NOT_ELIGIBLE`;
-2. otherwise it is evaluated; DOES_NOT_MATCH stands, but a passing value is MATCH only if
-   `satisfies_stop_dependent_constraints` is true, else UNCONFIRMED `STOP_MATCH_NOT_SUPPORTED`.
-
-Targets and preferences use step 1 only. The `stop_state` facet shows the state per record.
+A configuration without a blocking stop returns `UNCONFIRMED` with reason `STOP_NOT_ELIGIBLE`.
+For an eligible stop, the requested fact still needs comparable conditions and any requested
+evidence. Targets and preferences use the same stop eligibility check. The `stop_state` facet
+shows the state per record.
 
 ## Spectral coverage versus discovery span
 
@@ -72,20 +69,17 @@ Targets and preferences use step 1 only. The `stop_state` facet shows the state 
 * Sampled wavelengths: `spectrum.sampling_wavelengths_nm` with `includes_all` or `eq`; spectral
   weights with `proportional_weights` (same ordered wavelengths, weights compared by ratio).
   `covers_interval` on a list of samples is UNCONFIRMED `VALUE_TYPE`: it needs an interval object.
-## Provenance checks
 
-`engine_check`, `property_list_comparison`, `field.prescription_dump_check` and
-`materials.catalog_comparisons` (and a named glass's `catalog_comparison`) compare source data.
-They are provenance, never values:
+## Project facts and provenance
 
-* they are not typed facts; `inspect --fields` shows them under `checks` of the facts they
-  concern (`prescription_dump_check` under every `field.*` fact) and `inspect --sections` shows
-  the section that holds them;
-* a constraint that reaches one (by its path, through a parent object such as the whole `field`
-  section with path `""`, by a nested predicate path, or by `select`/`conditions` naming it) is
-  UNCONFIRMED `COMPARISON_ONLY`;
-* a target, preference (either form), range, `fields` entry, `fields --fact` or `--fields`
-  naming one is `UNKNOWN_FIELD` with `details.provenance_check`: it cannot be matched or ranked.
+Search uses optical values declared in or derived from the native Project and analysis results
+that apply to that Project. A constraint that explicitly names a historical source comparison
+such as `engine_check` or `field.prescription_dump_check` is `UNCONFIRMED` with `COMPARISON_ONLY`.
+A target, preference, range or field naming one returns `UNKNOWN_FIELD`. Whole-section requests
+use the projected Project facts.
+
+Use `inspect ID --provenance` to read the direct source, attribution and redistribution terms.
+Use `inspect ID --evidence SECTION` to read a supporting calculation or analysis for the Project.
 
 ## Aperture conventions
 
@@ -122,16 +116,19 @@ comparison keys.
 
 ## Sampling grids
 
-`sampled_field_fractions` is a comparison condition of a sampled value: an interval MTF is a
-minimum over the sampled positions, so minima over different grids are not the same quantity.
-`required_sampled_field_fractions` (a non-empty list of numbers, compared in order) pins the
-grid of a constraint, target or shorthand preference; a different or missing grid is
-`SAMPLING_DIFFERS`. A target or preference on a value with a grid it does not pin is unknown
-`SAMPLING_UNSPECIFIED`, so different grids are never silently ranked together (the fixture cost
-form cannot pin one). The quick flags `--target` and `--prefer` cannot pin a grid: use
-`--request`. `fields` lists each grid as its own condition variant, and `compare` marks rows
-with different grids `comparable: false` (`differs_by: sampled_field_fractions`).
-`requires_evidence_source` requires a resolvable source.
+`sampled_field_fractions` lists the ordered positions used to compute a sampled value. Changing
+those positions can change an interval MTF minimum. Use `required_sampled_field_fractions` to
+pin an exact grid in a constraint, target or shorthand preference. A different or missing grid
+then yields `SAMPLING_DIFFERS`.
+
+A target or preference can rank eligible values using a shared grid if their units, structured
+conditions and performance qualifiers also agree. Different unpinned grids yield
+`SAMPLING_UNSPECIFIED`, including a mix of sampled and unsampled values. A shared grid with
+other differences yields `CONDITIONS_DIFFER`. Search reports the reason in `unknowns` and
+omits the term from ranking. To pin a grid, use `--request FILE`.
+
+`fields` lists each grid as its own condition variant. `compare` marks rows with different
+grids `comparable: false` with `sampled_field_fractions` in `differs_by`.
 
 ## Evidence
 
@@ -160,9 +157,10 @@ applicable section, keyed by file path.
 
 ## Bases
 
-Each fact has a `basis`: SOURCE_STATED (from the source), DERIVED (computed from stated data),
-ENGINE_COMPUTED (computed by os-optics from the Project) or another text (class OTHER). A basis
-is reported, never used to decide an outcome.
+`PROJECT_DECLARED` identifies a native Project value. `PROJECT_DERIVED` identifies a value
+computed from Project data. `ENGINE_COMPUTED` identifies a calculation by `os-optics`. Some
+applicable analyses retain a legacy `DERIVED` basis. Search compares the projected facts under
+their applicable conditions.
 
 ## Configurations
 

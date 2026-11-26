@@ -85,7 +85,7 @@ One row per indexed record, ordered by `record_id`.
 | `project_path TEXT`, `project_sha256 TEXT` | the normalized `native_project.path` and the SHA-256 of the Project's LF bytes (equal to `native_project.sha256`) |
 | `engine_version TEXT` | `native_project.engine_version` |
 | `configuration_count INTEGER` | number of indexed configurations |
-| `record_json TEXT NOT NULL` | canonical JSON of the parsed `record.json` |
+| `record_json TEXT NOT NULL` | Canonical JSON of the record and native Project identity plus allowlisted direct-source metadata for `inspect --provenance`. Configuration facts live in `view_json`. |
 
 ### `configurations`
 
@@ -102,12 +102,10 @@ view, which constraint evaluation reads.
 | `ordinal INTEGER NOT NULL` | 0-based position in the record's `configurations` (0 for the single row) |
 | `view_json TEXT NOT NULL` | canonical JSON of the configuration view (see below) |
 
-The configuration view is a deep copy of the record with these changes:
-
-- top-level `configurations` is removed;
-- each section in the configuration entry replaces the top-level section of the same name, and an
-  entry's `conjugate` replaces `design.conjugate`;
-- `view.configuration = {configuration_id, label, native}` is attached.
+The configuration view projects the record onto Project facts and retrieval metadata. It omits
+source optical values and historical intake checks. Each section in the configuration entry
+replaces the top-level section of the same name, and `conjugate` replaces `design.conjugate`.
+`view.configuration = {configuration_id, label, native}` identifies the configuration.
 
 A record without `configurations` has exactly one row:
 
@@ -123,7 +121,7 @@ basis TEXT NOT NULL)`, indexed on `(facet, value)` and `(record_pk, config_pk)`.
 
 - **Record-level** facets have `config_pk` NULL: `collection`, `family`, `design_scope`,
   `design_type`, `source_lens_type`, `function`, `application`, `structure`, `module_role`,
-  `stop_state`, `validation`.
+  `stop_state`.
 - **Configuration-level** facets have `config_pk` set: `band`, `image_format`, `conjugate`,
   `field_kind`, `system_aperture`, `evidence`.
 - `value` is the canonical lower_snake_case term. `source_lens_type` is kept verbatim. An
@@ -152,7 +150,7 @@ table.** Both come from the same view, so they cannot disagree.
 | `value_min REAL`, `value_max REAL` | interval bounds (`min_nm`/`max_nm`, `min_<s>`/`max_<s>`) |
 | `value_json TEXT` | canonical JSON of the raw value (numbers, lists, strings, booleans, a whole analysis study) |
 | `unit TEXT` | from the member name: a name containing `_fraction_of_` (e.g. `field_fraction_of_stated_half_field`) is a ratio → `"1"`; otherwise `_lp_mm`→`lp/mm`, `_percent`, `_deg`, `_um`, `_nm`, `_mm`. f-number, numerical aperture, `_count`, `_fraction` and `_weight` names → `"1"`. Otherwise NULL |
-| `basis TEXT`, `basis_class TEXT` | the fact's own `basis`, else the sibling `<stem>_basis`, else the section `basis` when it applies (amendment 10.7). `basis_class` is the leading token `SOURCE_STATED`, `DERIVED` or `ENGINE_COMPUTED`, else `OTHER` |
+| `basis TEXT`, `basis_class TEXT` | the fact's own `basis`, else the sibling `<stem>_basis`, else the section `basis` when it applies (amendment 10.7). `basis_class` is the leading token `PROJECT_DECLARED`, `PROJECT_DERIVED`, `DERIVED` or `ENGINE_COMPUTED`. Other labels use `OTHER` |
 | `conditions_json TEXT` | canonical JSON of an object `conditions`. Integral floats are normalized to integers, so equal conditions compare equal as text |
 | `conditions_text TEXT` | prose `conditions` string, verbatim (then `conditions_json` is NULL) |
 | `definition TEXT` | `definition` / `condition` prose, verbatim |
@@ -165,9 +163,9 @@ table.** Both come from the same view, so they cannot disagree.
 | `sampled_field_fractions_json TEXT` | canonical JSON of the sampling grid (`sampled_field_fractions`) of the object the fact resolves to (a performance entry, member object, section or study), else NULL; a comparison condition for `fields` and `compare` |
 | `source_ref_pk INTEGER` | the `evidence_refs` row of the fact's own `source`, else NULL |
 
-Provenance checks (`engine_check`, `property_list_comparison`, `prescription_dump_check`,
-`catalog_comparisons`, `catalog_comparison`; `fact_extraction.check_members`) never become
-facts.
+Historical comparisons such as `engine_check`, `property_list_comparison`,
+`prescription_dump_check`, `catalog_comparisons` and `catalog_comparison` are omitted from the
+configuration view. An eligible engine result can be promoted to its ordinary Project fact key.
 
 ### `evidence_files(path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, content BLOB NOT NULL)`
 
@@ -366,7 +364,7 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 | `BATCH_MANIFEST_MISMATCH` | error | A manifest's `accepted_record_ids` names a record that is not present in its collection. |
 | `BATCH_MANIFEST_MISMATCH` | warning | A manifest's `collection.collection_id` differs from its directory; or an indexed record is absent from every manifest of its collection (only when the collection has at least one manifest). |
 | `UNKNOWN_TERM` | warning | A `lens_type`, tag or `module_role` is not in the vocabulary. The value is still indexed (lens type under `source_lens_type` only, a tag normalized, a module role verbatim), so new series work before the vocabulary catches up. |
-| `NO_SYSTEM_APERTURE` | warning | No aperture fact of a configuration is marked `system_aperture: true`. |
+| `NO_SYSTEM_APERTURE` | warning | The configuration has neither a declared aperture in the record nor a system aperture in the Project projection. A legacy declaration suppresses this intake warning without making its value searchable. |
 | `UNIT_UNKNOWN` | warning | A numeric fact outside `design.*` has no unit inferable from its name. |
 
 Build-level errors that are not findings: `INVALID_REQUEST` (exit code 2) when `--corpus` has no

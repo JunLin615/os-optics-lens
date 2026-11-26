@@ -387,9 +387,9 @@ class Compare(unittest.TestCase):
                          [P2B, SONNAR, "lenslibrary-1792917"])
         efl = rows["first_order.effective_focal_length_mm"]
         self.assertTrue(all(cell is not None for cell in efl["values"]))
-        track = rows["first_order.total_track_mm"]
-        self.assertFalse(track["comparable"])
-        self.assertIn("conditions", track["differs_by"])
+        self.assertFalse(efl["comparable"])
+        self.assertIn("conditions", efl["differs_by"])
+        self.assertTrue(rows["first_order.total_track_mm"]["comparable"])
         pair = query.compare(INDEX, [P2B, SONNAR], fields=["first_order.total_track_mm", "performance.mtf"])
         pair_rows = {row["fact"]: row for row in pair["result"]["rows"]}
         self.assertTrue(pair_rows["first_order.total_track_mm"]["comparable"])
@@ -421,14 +421,16 @@ class Inspect(unittest.TestCase):
             f"records/yutong-cup/{P2B}/evidence.json"])
         self.assertEqual(result["configuration"]["configuration_id"], None)
         self.assertNotIn("fields", result)
-        self.assertEqual(result["license"]["spdx"], "MIT")
+        self.assertNotIn("license", result)
+        self.assertNotIn("provenance", result)
+        self.assertEqual(query.inspect(INDEX, P2B, provenance=True)["result"]["provenance"]["license"]["spdx"], "MIT")
 
     def test_fields_evidence_prescription(self) -> None:
-        result = query.inspect(INDEX, "lenslibrary-1792917", fields=["first_order", "aperture.f_number"])["result"]
+        result = query.inspect(INDEX, P2B, fields=["first_order", "aperture.stop_opening_diameter_mm"])["result"]
         fields = result["fields"]
-        self.assertIn("engine_check", fields["first_order.back_focal_length_mm"]["checks"])
-        self.assertTrue(fields["aperture.f_number"]["system_aperture"])
-        self.assertEqual(fields["aperture.f_number"]["value"]["value"], 4.5)
+        self.assertNotIn("checks", fields["first_order.back_focal_length_mm"])
+        self.assertTrue(fields["aperture.stop_opening_diameter_mm"]["system_aperture"])
+        self.assertAlmostEqual(fields["aperture.stop_opening_diameter_mm"]["value"]["value"], 24.852063868184835)
         evidence = query.inspect(INDEX, P2B, evidence=["back_focus"])["result"]["evidence_sections"]
         section = next(iter(evidence.values()))["sections"]["back_focus"]
         self.assertIn("value_mm", section)
@@ -465,7 +467,9 @@ class Project(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(data).hexdigest(), record["native_project"]["sha256"])
                 self.assertEqual(meta["size_bytes"], len(data))
                 self.assertEqual(meta["revision"], record["record_revision"])
-                self.assertIn("notice_path", meta["license"])
+                self.assertTrue(meta["configurations"])
+                self.assertNotIn("license", meta)
+                self.assertNotIn("attribution", meta)
         response = query.project_response(INDEX, P2B, extra={"path": "/tmp/x.json"})
         check_bounds(self, response)
         self.assertEqual(response["result"]["path"], "/tmp/x.json")
