@@ -382,21 +382,22 @@ class SearchTest(EnvelopeTest):
         request.write_text(json.dumps({"mode": "starting_point",
                                        "targets": [{"fact": "first_order.effective_focal_length_mm", "target": 50}]}),
                            encoding="utf-8")
-        full = self.assert_ok(run_cli("search", "--request", str(request), "--limit", "50",
-                                      "--max-output-bytes", "262144"))
-        self.assertIsNone(full["result"]["page"]["next_cursor"])
-        expected = [c["record_id"] for c in full["result"]["candidates"]]
+        def every_page(*options: str) -> tuple[list[str], int]:
+            seen: list[str] = []
+            cursor = None
+            while True:
+                extra = ["--cursor", cursor] if cursor else []
+                page = self.assert_ok(run_cli("search", "--request", str(request), *options, *extra))
+                seen += [c["record_id"] for c in page["result"]["candidates"]]
+                cursor = page["result"]["page"]["next_cursor"]
+                if cursor is None:
+                    return seen, page["result"]["total"]["listed"]
+
+        # The corpus grows with new batches and can exceed one page of the largest size.
+        expected, listed = every_page("--limit", "50", "--max-output-bytes", "262144")
+        self.assertEqual(len(expected), listed)
         self.assertGreater(len(expected), 15)
-        seen: list[str] = []
-        cursor = None
-        for _ in range(len(expected)):
-            extra = ["--cursor", cursor] if cursor else []
-            page = self.assert_ok(run_cli("search", "--request", str(request), "--limit", "15", *extra))
-            seen += [c["record_id"] for c in page["result"]["candidates"]]
-            cursor = page["result"]["page"]["next_cursor"]
-            if cursor is None:
-                break
-        self.assertEqual(seen, expected)
+        self.assertEqual(every_page("--limit", "15")[0], expected)
 
     def test_batch_budget(self) -> None:
         request = TMP / "batch-budget.json"

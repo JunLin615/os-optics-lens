@@ -228,9 +228,9 @@ class Specification(unittest.TestCase):
                    "constraints": [{"fact": "first_order.effective_focal_length_mm", "op": "lte", "value": 30}],
                    "preferences": [{"fact": "first_order.total_track_mm", "direction": "descending"}],
                    "limit": 50, "include": ["MATCH", "UNCONFIRMED", "DOES_NOT_MATCH"], "max_output_bytes": 262144}
-        response = query.run_request(INDEX, request)
-        candidates = response["result"]["candidates"]
-        total = response["result"]["total"]
+        # The corpus grows with new batches and can exceed one page: follow the cursors.
+        candidates = search_all(request)
+        total = query.run_request(INDEX, request)["result"]["total"]
         self.assertEqual(total["listed"], len(candidates))
         order = {"MATCH": 0, "UNCONFIRMED": 1, "DOES_NOT_MATCH": 2}
         keys = [(order[c["rank"]["key"][0]], tuple((e[0], e[1] or 0) for e in c["rank"]["key"][1:-2]),
@@ -478,17 +478,19 @@ class Pagination(unittest.TestCase):
                "limit": 7}
 
     def test_pages_concatenate_to_the_full_list(self) -> None:
-        full = query.run_request(INDEX, dict(self.REQUEST, limit=50, max_output_bytes=262144))
-        self.assertIsNone(full["result"]["page"]["next_cursor"])
+        # Pages of the largest size and pages of seven give the same list, however large the corpus.
+        large = dict(self.REQUEST, limit=50, max_output_bytes=262144)
+        listed = query.run_request(INDEX, large)["result"]["total"]["listed"]
+        full = search_all(large)
         pages = search_all(self.REQUEST)
-        self.assertEqual(pages, full["result"]["candidates"])
-        self.assertEqual(len(pages), full["result"]["total"]["listed"])
+        self.assertEqual(pages, full)
+        self.assertEqual(len(pages), listed)
         again = search_all(self.REQUEST)
         self.assertEqual(pages, again)
         first = query.run_request(INDEX, self.REQUEST)
         cursor = first["result"]["page"]["next_cursor"]
         other_limit = query.run_request(INDEX, dict(self.REQUEST, limit=3, cursor=cursor))
-        self.assertEqual(other_limit["result"]["candidates"], full["result"]["candidates"][7:10])
+        self.assertEqual(other_limit["result"]["candidates"], full[7:10])
 
     def test_cursor_errors(self) -> None:
         cursor = query.run_request(INDEX, self.REQUEST)["result"]["page"]["next_cursor"]
