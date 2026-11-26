@@ -28,7 +28,8 @@ Per key: `records` (count in scope), `unit`, `value_type`, `bases`, `condition_v
 
 `--fact KEY` adds `value_paths` (numeric members, e.g. sagittal/tangential), `applicable_ops`,
 `eligible_for` (DISCOVERY_ONLY marks discovery facts), `constraint_form` ({scope, metric, path}),
-up to 10 `variants` of conditions/qualifiers with counts, and `example_constraint`: a valid
+up to 10 `variants` of conditions/qualifiers/sampling grids with counts, and `example_constraint`
+(with `required_sampled_field_fractions` for a sampled fact): a valid
 constraint (or `example_filter` for discovery-only facts) you can paste into `constraints` and
 tighten. Its numeric value spans the most common variant's min..max, so narrow it to your brief.
 
@@ -55,4 +56,6 @@ Interval facts (min_/max_ members, e.g. `performance.distortion_range`) need `pa
 `basis` is the fact's own basis or the nearest applicable one; its class is SOURCE_STATED,
 DERIVED, ENGINE_COMPUTED or OTHER. Structured `conditions` are comparison keys; prose
 conditions (`conditions_text`) are information only. `compare` marks rows whose units,
-conditions or qualifiers differ as `comparable: false` with `differs_by`.
+conditions, qualifiers or sampling grids differ as `comparable: false` with `differs_by`.
+Provenance checks (`engine_check`, `property_list_comparison`, `field.prescription_dump_check`,
+`materials.catalog_comparisons`) are not facts (`help semantics`).

@@ -129,6 +129,10 @@ def native_configurations(project: Any) -> tuple[list[NativeConfiguration], list
                                 "compared case-insensitively)", True))
             continue
         seen[cid.lower()] = cid
+        for member in ("label", "name"):
+            if entry.get(member) is not None and not isinstance(entry[member], str):
+                issues.append(Issue("error", "PROJECT_CONFIGURATION_INVALID", f"{where}.{member}",
+                                    f"a Project configuration's {member} must be a string", True))
         label = entry.get("label") if isinstance(entry.get("label"), str) else None
         if label is None and isinstance(entry.get("name"), str):
             label = entry["name"]
@@ -364,7 +368,7 @@ class _FactBuilder:
             "value_max": None, "value_json": None, "unit": None, "basis": None, "basis_class": None,
             "conditions_json": None, "conditions_text": None, "definition": None, "eligible_for": None,
             "state": None, "system_aperture": None, "qualifiers_json": None, "value_paths": None,
-            "constraint_form": None, "source": None, "source_field": None,
+            "constraint_form": None, "sampled_field_fractions_json": None, "source": None, "source_field": None,
         }
         fact.update(fields)
         fact["basis_class"] = basis_class(fact["basis"])
@@ -419,6 +423,8 @@ class _FactBuilder:
         return None
 
     def section(self, section: str, content: dict[str, Any]) -> None:
+        # A scalar member resolves to its section object, so the section's grid (if any) is its grid.
+        grid = _grid(content)
         for member in sorted(content):
             value = content[member]
             if self.skipped(member):
@@ -432,7 +438,7 @@ class _FactBuilder:
                 self.add(fact_key=key, json_path=key, value_num=float(value), value_json=canonical_json(value),
                          unit=unit_for(member), basis=basis, definition=definition,
                          state=self.section_state(section, None),
-                         constraint_form=_form([section], None, member))
+                         constraint_form=_form([section], None, member), **grid)
             elif isinstance(value, list):
                 if value and all(_scalar(item) and item is not None for item in value):
                     basis = self.member_basis(section, content, member, None)
@@ -440,12 +446,12 @@ class _FactBuilder:
                     self.add(fact_key=key, json_path=key, value_json=canonical_json(value),
                              unit=unit_for(member), basis=basis, definition=definition,
                              state=self.section_state(section, None),
-                             constraint_form=_form([section], None, member))
+                             constraint_form=_form([section], None, member), **grid)
             elif isinstance(value, (str, bool)):
                 basis = self.member_basis(section, content, member, None)
                 self.add(fact_key=key, json_path=key, value_json=canonical_json(value), basis=basis,
                          state=self.section_state(section, None),
-                         constraint_form=_form([section], None, member))
+                         constraint_form=_form([section], None, member), **grid)
 
     def object_member(self, section: str, content: dict[str, Any], member: str, obj: dict[str, Any]) -> None:
         key = f"{section}.{member}"
@@ -458,6 +464,7 @@ class _FactBuilder:
             "source": obj.get("source") if isinstance(obj.get("source"), dict) else None,
             "source_field": f"{key}.source" if isinstance(obj.get("source"), dict) else None,
             **_conditions(obj),
+            **_grid(obj),
         }
         if "value" in obj:
             value = obj["value"]
@@ -528,6 +535,7 @@ class _FactBuilder:
                 "qualifiers_json": canonical_key(qualifiers) if qualifiers else None,
                 "value_paths": canonical_json(value_like) if value_like else None,
                 **_conditions(entry),
+                **_grid(entry),
             }
             if value_member is not None and is_number(entry.get(value_member)):
                 value = entry[value_member]
@@ -557,7 +565,7 @@ class _FactBuilder:
                      state=obj.get("status") if isinstance(obj.get("status"), str) else None,
                      source=obj.get("source") if isinstance(obj.get("source"), dict) else None,
                      source_field=f"{key}.source" if isinstance(obj.get("source"), dict) else None,
-                     constraint_form=_form(["analysis_evidence", study], None, None))
+                     constraint_form=_form(["analysis_evidence", study], None, None), **_grid(obj))
 
 
 def _prose(obj: dict[str, Any]) -> str | None:
@@ -574,6 +582,13 @@ def _conditions(obj: dict[str, Any]) -> dict[str, Any]:
     return {"conditions_json": None, "conditions_text": None}
 
 
+def _grid(obj: dict[str, Any]) -> dict[str, Any]:
+    """The sampling grid (`sampled_field_fractions`) of the object a fact resolves to: a
+    comparison condition of its values."""
+    grid = obj.get("sampled_field_fractions")
+    return {"sampled_field_fractions_json": None if grid is None else canonical_key(grid)}
+
+
 def _form(scope: list[str], metric: str | None, path: str | None) -> str:
     return canonical_json({"scope": scope, "metric": metric, "path": path})
 
@@ -584,7 +599,7 @@ def extract_facts(view: dict[str, Any], vocabulary: Vocabulary | None = None) ->
     Each fact is a dict with the facts-table columns: fact_key, json_path, metric, value_num,
     value_min, value_max, value_json, unit, basis, basis_class, conditions_json, conditions_text,
     definition, eligible_for, state, system_aperture, qualifiers_json, value_paths (JSON text),
-    constraint_form (JSON text), plus `source` (the fact's raw source object or None) and
+    constraint_form (JSON text), sampled_field_fractions_json (the sampling grid), plus `source` (the fact's raw source object or None) and
     `source_field` (the view location of that object, e.g. `performance[4].source`) for linking to an
     evidence reference. JSON columns hold canonical JSON; conditions and qualifiers are normalized
     with `canonical_key` so equal conditions compare equal as text.
@@ -614,7 +629,7 @@ def _str_list(value: Any) -> list[str]:
 
 def record_facets(record: dict[str, Any], vocabulary: Vocabulary | None = None) -> tuple[list[FacetValue], list[Issue]]:
     """Record-level facets (collection, family, design_scope, design_type, source_lens_type, function,
-    application, structure, stop_state, validation) and UNKNOWN_TERM warnings."""
+    application, structure, module_role, stop_state, validation) and UNKNOWN_TERM warnings."""
     vocab = vocabulary or load_vocabulary()
     values: set[FacetValue] = set()
     issues: list[Issue] = []
@@ -660,6 +675,15 @@ def record_facets(record: dict[str, Any], vocabulary: Vocabulary | None = None) 
     for application in mapped_applications:
         if application not in present_applications:
             values.add(FacetValue("application", application, MAPPING_BASIS))
+
+    module_role = design.get("module_role")
+    if isinstance(module_role, str) and module_role.strip():
+        term, basis, known = vocab.canonical_record_term("module_role", module_role)
+        values.add(FacetValue("module_role", term if known else module_role, basis))
+        if not known and vocab.warns_unknown("module_role"):
+            issues.append(Issue("warning", "UNKNOWN_TERM", "design.module_role",
+                                f"module_role term {module_role!r} is not in the vocabulary; it is indexed "
+                                "verbatim"))
 
     validity = design.get("aperture_validity")
     if isinstance(validity, dict):

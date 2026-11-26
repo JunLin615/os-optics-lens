@@ -64,7 +64,7 @@ os-optics-lens facets --facet design_type --facet image_format --facet band
 ```
 
 ```
-{"ok":true,"snapshot":{"id":"db03814630c2a339","records":41,"configurations":41},
+{"ok":true,"snapshot":{"id":"0262201eaf2c8e3c","records":41,"configurations":41},
  "result":{"records":41,"configurations":41,"facets":{
    "design_type":{"level":"record","values":[["camera_lens",22],["microscope_objective",10],["endoscope_objective",8]],"more":0},
    "image_format":{"level":"configuration","values":[["full_frame",2]],"more":0},
@@ -111,8 +111,8 @@ os-optics-lens compare lenslibrary-528155 yutong-2025-mirrorless-18-p2b \
   --fields first_order.effective_focal_length_mm,aperture.f_number,aperture.entrance_pupil_f_number
 ```
 
-A missing value is `null` with its position in `missing`. Rows whose units, conditions or
-qualifiers differ are `comparable: false` with `differs_by`.
+A missing value is `null` with its position in `missing`. Rows whose units, conditions,
+qualifiers or sampling grids differ are `comparable: false` with `differs_by`.
 
 **5. Inspect** one candidate: the default lists fact keys and evidence sections. Then ask for
 what the decision needs:
@@ -155,7 +155,7 @@ os-optics-lens search  [REQUEST_JSON | - | --request FILE | --fixture FILE] [--e
                        output: --fields K1,K2 --detail compact|full --limit N --cursor C
 os-optics-lens compare REF REF ... [--fields K1,K2]          REF = record_id[@configuration_id]
 os-optics-lens inspect RECORD_ID [--revision N] [--configuration ID] [--fields K1,K2]
-                       [--sections S1,S2] [--evidence S|all] [--prescription summary|full]
+                       [--sections S1,S2] [--evidence S|PATH#S|all] [--prescription summary|full]
 os-optics-lens project RECORD_ID [--revision N] [--out FILE [--force] | --stdout]
 os-optics-lens index build    [--corpus DIR] [--out FILE] [--allow-unresolved-evidence]
 os-optics-lens index validate [--corpus DIR] [--allow-unresolved-evidence]
@@ -223,8 +223,8 @@ is `INVALID_REQUEST` with the pointer of the repeated member (it never silently 
 | `mode` | required: `specification` (hard constraints decide the outcome) or `starting_point` (targets rank near matches) |
 | `filters` | discovery narrowing: `facets` (OR within, AND across; aliases), `ranges` (`min` and/or `max` over a numeric fact; a record without the fact is excluded), `spectral_span` (sampling span overlaps; discovery only), `record_ids`, `collections` (both non-empty lists of strings when present; omit them for no restriction) |
 | `constraints` | hard constraints; required (non-empty) in specification mode |
-| `targets` | starting_point only: `{id?, fact, target, op?: "near", tolerance? \| relative_tolerance?, conditions?, select?, path?, weight?: 1}`; the scale (`tolerance`, else `relative_tolerance * \|target\|`, else `\|target\|`) must be a normal positive number, and a normalized deviation or weighted score that is not finite is `INVALID_REQUEST` |
-| `preferences` | list, applied in order: `{fact, direction: ascending\|descending, conditions?, select?, path?}` or the fixture's cost form |
+| `targets` | starting_point only: `{id?, fact, target, op?: "near", tolerance? \| relative_tolerance?, conditions?, select?, path?, required_sampled_field_fractions?, weight?: 1}`; the scale (`tolerance`, else `relative_tolerance * \|target\|`, else `\|target\|`) must be a normal positive number, and a normalized deviation or weighted score that is not finite is `INVALID_REQUEST` |
+| `preferences` | list, applied in order: `{fact, direction: ascending\|descending, conditions?, select?, path?, required_sampled_field_fractions?}` or the fixture's cost form |
 | `include` | outcomes listed: default `MATCH`, `UNCONFIRMED` (specification), all three (starting_point) |
 | `hard_shortfall` | starting_point: `exclude` (default) drops configurations with a hard DOES_NOT_MATCH; `allow` keeps and ranks them |
 | `evaluation_scope` | only `one_nominal_configuration` (default) |
@@ -233,6 +233,18 @@ is `INVALID_REQUEST` with the pointer of the repeated member (it never silently 
 | `limit` | candidates per page, 1..50 (default 10) |
 | `cursor` | `page.next_cursor` of the previous page |
 | `max_output_bytes` | 2048..262144 (default 32768) |
+
+Facets are listed with `os-optics-lens facets` (descriptions with `--describe`; see
+`help facets`). Phone records add the record-level facet `module_role` from `design.module_role`
+(`main_camera`, `ultrawide`, `telephoto`, `front_camera`; aliases `main`, `ultra_wide`, `tele`,
+`front`): where the module sits in a device, not what the prescription is. A record value outside
+those terms is indexed verbatim with an `UNKNOWN_TERM` build warning, and a filter matches it
+exactly. A canonical term with no records gives an empty result with `FACET_VALUE_EMPTY`.
+
+```
+os-optics-lens facets --facet module_role
+os-optics-lens search --mode starting_point --filter module_role=tele --prefer first_order.total_track_mm
+```
 
 ### Constraints
 
@@ -251,7 +263,11 @@ expanded against each configuration view:
 - `path` names another member, for example `"path": "min_percent"` on the interval fact
   `performance.distortion_range`. An interval without `path` is `INVALID_REQUEST`, except with
   `covers_interval`.
-- `conditions` pins condition members by JSON value equality.
+- `conditions` pins condition members by JSON value equality; every pinned member must be
+  present in the fact (see [Performance conditions](#performance-conditions)).
+- `required_sampled_field_fractions` (a non-empty list of finite numbers; `null` and `[]` are
+  `INVALID_REQUEST`) pins the fact's sampling grid; targets and shorthand preferences accept it
+  too (see [Sampling grids](#sampling-grids)).
 - `select` narrows metric entries by top-level members before conditions are compared, for
   example `{"frequency_lp_mm": 30, "image_height_mm": 12.0, "direction": "sagittal"}`.
 
@@ -285,12 +301,19 @@ requires_*?}` of `acceptance/*.json` is accepted verbatim.
 | `--include MATCH,UNCONFIRMED` | `include` |
 | `--hard-shortfall allow` | `hard_shortfall` |
 
+The quick flags cannot pin a sampling grid: to rank a sampled value such as
+`performance.mtf_field_minimum`, write the request with `required_sampled_field_fractions` and
+pass `--request FILE`.
+
 `--fields`, `--detail`, `--limit`, `--cursor` and `--max-output-bytes` also work with a
 single-query document. The flags that build a query cannot be combined with a document.
 `--explain-request` prints the normalized query (aliases resolved, defaults and ids filled in,
 shorthands as written) and its `query_digest` without searching. With a cursor it also checks
-the cursor against the index snapshot and the query (`CURSOR_INVALID`, `CURSOR_MISMATCH`,
-`SNAPSHOT_MISMATCH`, as the search would) and echoes the decoded `options.cursor_offset`. `--fixture FILE` runs an
+the cursor against the reader, the index snapshot and the query (`CURSOR_INVALID`,
+`CURSOR_SEMANTICS_MISMATCH`, `SNAPSHOT_MISMATCH`, `CURSOR_MISMATCH`, as the search would) and
+echoes the decoded `options.cursor_offset`. It is bounded like the search: by
+`--max-output-bytes`, else the request's `max_output_bytes` (single or batch), else 32768; an
+explanation that does not fit is `OUTPUT_LIMIT_EXCEEDED` (`details.required_bytes`). `--fixture FILE` runs an
 acceptance fixture as `{mode: specification, filters: {record_ids: [record.id]}, constraints,
 preferences: [ranking_preference], evaluation_scope, detail: full}`.
 
@@ -332,11 +355,13 @@ os-optics-lens search --request brief.json --limit 15
 os-optics-lens search --request brief.json --limit 15 --cursor eyJvIjoxNSwicSI6IjhlZTA5...
 ```
 
-In a batch, put each sub-query's cursor into that sub-query. A cursor binds to the index
-snapshot and to the query's mode, filters, constraints, targets, preferences, include,
+In a batch, put each sub-query's cursor into that sub-query. A cursor binds to the reader's query
+code and vocabulary, to the index snapshot and to the query's mode, filters, constraints, targets, preferences, include,
 hard_shortfall and evaluation scope. `limit`, `fields` and `detail` may change between pages.
 For the same snapshot and query, the pages are identical, and concatenating them gives the
-full ordered list.
+full ordered list. After an upgrade that changes the query code or the vocabulary, an older cursor
+is `CURSOR_SEMANTICS_MISMATCH` (a version 1 cursor is `CURSOR_INVALID`): restart the search without
+a cursor. See [Reader compatibility](INDEX_SCHEMA.md#reader-compatibility).
 
 ## Response format
 
@@ -400,7 +425,8 @@ full ordered list.
   basis, conditions, source {path, section, status}}` and per-predicate results.
 - **`shortfalls`**:
   - hard DOES_NOT_MATCH gaps: `{constraint, path, value, limit, shortfall, relative, strict?,
-    unit?}`; a non-numeric failure lists its failing predicates instead;
+    unit?}`; `shortfall` and `relative` are `null` when not representable as finite numbers; a
+    non-numeric failure lists its failing predicates instead;
   - target deviations: `{target, fact, value, target_value, deviation, normalized, scale_basis,
     weight, unit}`; the target score is the sum of `weight * normalized`.
 - **`unknowns`**: `{constraint | target | preference, reason}`.
@@ -424,11 +450,11 @@ full ordered list.
 ```
 {"ok": true, "snapshot": {...},
  "results": [{"index": 0, "ok": true, "result": {"mode": "starting_point", ..., "page": {"limit": 5, "offset": 0,
-               "returned": 2, "next_cursor": "eyJvIjoyLCJxIjoiOGVlMDlmMTYxZjAwYmVjYyIsInMiOiJkYjAzODE0NjMwYzJhMzM5IiwidiI6MX0"}}},
+               "returned": 1, "next_cursor": "eyJvIjoxLCJxIjoiOGVlMDlmMTYxZjAwYmVjYyIsInIiOiJlOGM1NWQ3NWQzYWQ1YjE4IiwicyI6IjAyNjIyMDFlYWYyYzhlM2MiLCJ2IjoyfQ"}}},
              {"index": 1, "ok": true, "result": {...}},
              {"index": 2, "ok": false, "error": {"code": "INVALID_REQUEST", "message": "...", "hint": "...",
                "details": {"pointer": "/queries/2/mode", ...}}}],
- "bounds": {"max_output_bytes": 4096, "output_bytes": 3621, "truncated": true}}
+ "bounds": {"max_output_bytes": 4096, "output_bytes": 3479, "truncated": true}}
 ```
 
 `ok` is false, and the exit code non-zero, only when every sub-query failed.
@@ -441,8 +467,8 @@ full ordered list.
 | `facets` | `{records, configurations, facets: {name: {level, values: [[value, records], ...], more, description?}}}` |
 | `fields` | `{records, fields: {key: {records, unit, value_type, bases, condition_variants, conditions_keys, min, max, stop_dependent}}, returned, more}` |
 | `fields --fact` | the key's summary plus `value_paths`, `applicable_ops`, `eligible_for`, `constraint_form`, `variants` (at most 10, `more_variants`), `example_constraint` or `example_filter` |
-| `compare` | `{candidates: [{ref, record_id, revision, configuration_id, title}], rows: [{fact, values: [cell \| null], comparable, differs_by?, missing?, notes?}]}`; refs must name distinct configurations (`ID` and `ID@<its default configuration>` are the same), and an empty id after `@` is `INVALID_REQUEST` |
-| `inspect` | identity, `collection`, `license`, `design`, `native_project`, `configuration`, `configurations`, `validation`, `facets`, `fact_keys`, `evidence {refs, sections}`, `next`; plus `fields`, `sections`, `evidence`, `prescription` when asked |
+| `compare` | `{candidates: [{ref, record_id, revision, configuration_id, title}], rows: [{fact, values: [cell \| null], comparable, differs_by?, missing?, notes?}]}`; `differs_by` may name `sampled_field_fractions`, and then each cell shows its grid (`null` without one); refs must name distinct configurations (`ID` and `ID@<its default configuration>` are the same), and an empty id after `@` is `INVALID_REQUEST` |
+| `inspect` | identity, `collection`, `license`, `design`, `native_project`, `configuration`, `configurations`, `validation`, `facets`, `fact_keys`, `evidence {refs, sections, files}` (scoped, see [Evidence](#evidence)), `next`; plus `fields`, `sections`, `evidence_sections {path: {sha256, sections}}`, `prescription` when asked |
 | `project` | `{record_id, revision, sha256, size_bytes, native_configuration_ids, engine_version, license, attribution, next}`; `--out` adds `path` (absolute) and `written_sha256`. The stored bytes are re-checked against `sha256` before anything is written; `--out` writes a temporary file and replaces the target only after it hashes correctly, and a path that cannot be written is `INVALID_REQUEST` naming it. `--max-output-bytes` is validated before any write and is rejected with `--stdout` |
 | `index build` / `validate` | `{out, snapshot_id, records, configurations, facts, warnings, findings, findings_omitted, use}`; `out` and `use` are null for validate |
 | `index dump` | `{index_schema_version, tables: {name: {columns, rows}}}`; not budgeted |
@@ -454,8 +480,10 @@ full ordered list.
 - **MATCH**: a comparable value under the requested conditions satisfies every predicate, and
   its evidence resolves when evidence is required.
 - **DOES_NOT_MATCH**: a comparable value violates a predicate. A numeric violation reports
-  `shortfall` (absolute distance to the violated limit, in the fact's unit) and `relative`. A
-  strict `gt`/`lt` at equality has shortfall 0.0 and `strict: true`.
+  `shortfall` (absolute distance to the violated limit, in the fact's unit) and `relative`
+  (shortfall / |limit|). A strict `gt`/`lt` at equality has shortfall 0.0 and `strict: true`.
+  Either number is `null` when it is not representable as a finite number, for example when a
+  gap is divided by a limit of 1e-308; the outcome is unaffected.
 - **UNCONFIRMED**: the record can neither confirm nor refute the constraint, and `reason` says
   why. An unknown is never a match and never a failure.
 
@@ -473,12 +501,13 @@ flexible targets, shortfalls and unknowns apart.
 | reason | meaning |
 |---|---|
 | `FACT_MISSING` | the configuration has no such fact. `details.available_alternatives` lists related facts, which are never substituted |
-| `CONDITIONS_DIFFER` | no entry has the requested conditions. `details` shows expected vs actual for the nearest entry |
+| `CONDITIONS_DIFFER` | no entry has the requested conditions. `details` shows `expected` vs `actual` for the nearest entry, or `present: false` for a member it does not state (spectrum members as `spectrum.<member>`) |
 | `AMBIGUOUS_FACTS` | several entries match. Pin more conditions or use `select` |
 | `DISCOVERY_ONLY` | the fact, or an object along or under the compared path, is discovery-only (e.g. `spectrum.sampling_span_nm`) |
-| `COMPARISON_ONLY` | the path reaches, or the compared object contains, a related check (`property_list_comparison`, `engine_check`): kept for comparison only, never a value, so it can neither satisfy nor refute a constraint |
+| `COMPARISON_ONLY` | the path reaches, or the compared object contains, a [provenance check](#provenance-checks): never a value, so it can neither satisfy nor refute a constraint |
 | `COVERAGE_UNCONFIRMED` | `spectrum.continuous_coverage_nm` is not CONFIRMED or SOURCE_STATED |
-| `SAMPLING_DIFFERS` | `required_sampled_field_fractions` differs from the fact's `sampled_field_fractions` |
+| `SAMPLING_DIFFERS` | `required_sampled_field_fractions` differs from the fact's `sampled_field_fractions`, or the fact states none |
+| `SAMPLING_UNSPECIFIED` | (targets and preferences) the value has a sampling grid the request does not pin |
 | `STOP_NOT_ELIGIBLE` | a stop-dependent fact on a Project whose stop does not block light |
 | `STOP_MATCH_NOT_SUPPORTED` | a stop-dependent value passes, but the record may not claim a stop-dependent match |
 | `EVIDENCE_MISSING` | evidence is required and the fact (or every method) has no source |
@@ -521,8 +550,25 @@ Targets and preferences apply step 1 only. `fields` reports `stop_dependent` per
 - `covers_interval` needs an interval object (one `min_`/`max_` member pair). A list, such as two
   sampled wavelengths `[532, 1064]`, says nothing about the gap between them and is UNCONFIRMED
   `VALUE_TYPE`.
-- A `property_list_comparison` (aperture or field) is a check kept for comparison, never a value:
-  any constraint on it is UNCONFIRMED `COMPARISON_ONLY`.
+
+### Provenance checks
+
+`first_order.engine_check`, the `property_list_comparison` of `aperture` and `field`,
+`field.prescription_dump_check` and `materials.catalog_comparisons` compare source data (see
+[RECORD_FORMAT.md](RECORD_FORMAT.md#provenance-checks)). They are never values:
+
+- they are not typed facts; `inspect --fields` shows them under `checks` of the facts they concern
+  (`prescription_dump_check` under every `field.*` fact), and `inspect --sections` shows the
+  section holding them;
+- a constraint reaching one (directly, through a parent object such as the whole `field` section
+  with path `""`, through a nested predicate path, or by a `select`/`conditions` key naming it) is
+  UNCONFIRMED `COMPARISON_ONLY`;
+- naming one as a target, preference (either form), range, summary `fields` entry,
+  `fields --fact`, `compare --fields` or `inspect --fields` is `UNKNOWN_FIELD` with
+  `details.provenance_check` and a hint that it cannot be matched or ranked.
+
+The record's `validation` states (such as `paraxial: MATCHED`) are the record's acceptance
+outcomes, not provenance checks; the `validation` facet exposes them for discovery.
 
 ### Aperture conventions
 
@@ -561,18 +607,78 @@ bounds, spectrum, image plane, orientation and so on.
 - A constraint compares only the entries whose conditions equal every key it pins. Equality is
   JSON value equality: `0 == 0.0`, a boolean never equals a number, lists are ordered and
   objects compare key-wise.
-- Keys it does not pin are reported as `unpinned` on a MATCH.
+- A pinned key must be **present** in the fact's `conditions`. An absent key never equals a
+  requested `null`; a stored explicit `null` does.
+- A `spectrum` object is compared member by member: every requested member must be present.
+  `incident_weights` compare by ratio, `sampling_wavelengths_nm` as an ordered list and every
+  other member (such as `wavelength_medium`) by JSON equality. Weights are meaningless without
+  their ordered wavelengths, so a request giving `incident_weights` without
+  `sampling_wavelengths_nm` is `INVALID_REQUEST`.
+- The same presence rule applies to `select`, target and preference `conditions`, and the cost
+  pins of the fixture preference form.
+- The reference evaluator in `tests/test_yutong_acceptance.py` treats an absent condition like
+  `null` and compares only a spectrum's wavelengths and weights. The retriever is deliberately
+  stricter in both cases; the reference file is kept unchanged.
+- Keys it does not pin are reported as `unpinned` on a MATCH, including the unrequested members
+  of a partly pinned spectrum (`spectrum.incident_weights`) and an unpinned sampling grid
+  (`sampled_field_fractions`).
 - Prose conditions (`conditions_text`) are information only.
 - `select` narrows entries by their top-level members, for example a frequency, image height and
   direction for a field-sampled MTF.
-- An interval MTF is a sampled minimum. `required_sampled_field_fractions` pins the sampled
-  positions, and `requires_evidence_source` requires the source to resolve.
+- `requires_evidence_source` requires the source to resolve.
+
+### Sampling grids
+
+An interval MTF is a minimum over its sampled field positions (`sampled_field_fractions`), so
+minima over different grids are different quantities. The grid is a comparison condition:
+
+- `required_sampled_field_fractions` pins it in a constraint, target or shorthand preference; a
+  different or missing grid is `SAMPLING_DIFFERS`.
+- A target or preference value with a grid that the request does not pin is unknown
+  `SAMPLING_UNSPECIFIED`, so values from different grids are never silently ranked together. The
+  fixture cost form cannot pin a grid; the `--target`/`--prefer` quick flags do not either.
+- `fields` and `fields --fact` list each grid as its own variant, and the example constraint of a
+  sampled fact includes `required_sampled_field_fractions`.
+- `compare` marks rows whose grids differ (including a grid against none)
+  `comparable: false` with `differs_by: ["sampled_field_fractions"]` and shows each cell's grid.
 
 ### Evidence
 
 A fact's `source {path, sha256, section}` resolves when the index holds that file with that
 SHA-256 over LF bytes and `sections[section]` exists. Resolution reads only the index and never
-the file system, so an installed package answers the same as a checkout.
+the file system, so an installed package answers the same as a checkout. The files follow one
+[evidence extract contract](RECORD_FORMAT.md#evidence-extracts): only members of `sections` are
+addressable.
+
+Every use of evidence **verifies the bytes**: the stored content is hashed again and must match
+both the stored digest and the one the reference expects. So every reported status is live:
+
+- constraints that require the evidence are `UNCONFIRMED` (`EVIDENCE_UNRESOLVED`) when the bytes
+  do not verify;
+- the default `inspect` shows the live status in `evidence.refs`, marks the file in
+  `evidence.files` with `"status": "HASH_MISMATCH"` (or `FILE_MISSING`) and lists no sections for
+  it;
+- `inspect --evidence` of a record with such a file fails with `INDEX_UNAVAILABLE` and shows none
+  of its bytes (the damaged file's sections are unknown, so no selection over that record is safe).
+  Rebuild the index.
+
+`inspect` scopes evidence to configurations. The **scope** is the `--configuration` named, else
+every configuration of the record. A configuration references a (file, section) pair when a source
+in its view names it.
+
+- A pair referenced only by configurations outside the scope does not apply.
+- The other sections of the files that the scope references, and of the record-level
+  `collection.evidence_extract` unless only outside configurations reference that file, apply. A
+  record with only an `evidence_extract` therefore resolves its sections.
+- The default output lists `evidence.refs`, `evidence.sections {path: [names]}` and
+  `evidence.files {path: {configurations, status?}}` (the configurations referencing each file;
+  `status` only for a damaged one), all
+  scoped.
+- `--evidence NAME` returns the one applicable file's section. Several distinct files with that
+  section are `EVIDENCE_AMBIGUOUS` (`details.candidates: [{path, configurations}]`); select one
+  as `--evidence path#section` or narrow with `--configuration`.
+- `--evidence all` returns every applicable pair. `evidence_sections` is keyed by path, so equally
+  named sections of different files are all kept.
 
 ### Configurations
 
@@ -604,18 +710,20 @@ A failure prints `{"ok": false, "error": {"code", "message", "hint", "details"}}
 | `UNKNOWN_FACET` | 2 | no such facet |
 | `UNKNOWN_FACET_VALUE` | 2 | a value that is neither a vocabulary term nor in the index (close values suggested) |
 | `AMBIGUOUS_TERM` | 2 | an alias with several meanings (`details.candidates`) |
-| `UNKNOWN_FIELD` | 2 | a fact key not in the index, used in ranges, targets, preferences, `fields --fact` or compare/inspect fields (`did_you_mean`) |
+| `UNKNOWN_FIELD` | 2 | a fact key not in the index, used in ranges, targets, preferences, `fields --fact` or compare/inspect fields (`did_you_mean`), or a provenance check name (`provenance_check`) |
 | `UNSUPPORTED_OPERATOR` | 2 | unknown `op` (`supported` lists the operators) |
-| `CURSOR_INVALID` | 2 | not a cursor |
+| `CURSOR_INVALID` | 2 | not a cursor, or a version 1 cursor (restart without it) |
 | `CURSOR_MISMATCH` | 2 | cursor of another query |
 | `OUTPUT_LIMIT_EXCEEDED` | 2 | the response cannot fit `max_output_bytes` (`required_bytes`) |
 | `FILE_EXISTS` | 2 | `project --out` target exists; add `--force` |
+| `EVIDENCE_AMBIGUOUS` | 2 | `inspect --evidence NAME` names a section of several files (`section`, `candidates: [{path, configurations}]`) |
 | `RECORD_NOT_FOUND` | 3 | unknown record id (`did_you_mean`) |
 | `REVISION_NOT_AVAILABLE` | 3 | the index holds another revision (`available_revision`) |
 | `CONFIGURATION_NOT_FOUND` | 3 | unknown configuration (`available`) |
-| `EVIDENCE_SECTION_NOT_FOUND` | 3 | `inspect --evidence` names a section the record does not have |
+| `EVIDENCE_SECTION_NOT_FOUND` | 3 | `inspect --evidence` names a section the configuration scope does not have (`available`) |
 | `SNAPSHOT_MISMATCH` | 4 | cursor from another index snapshot; rerun without it |
-| `INDEX_UNAVAILABLE` | 5 | no usable index (`tried: [{source, path, problem}]`), or a damaged index whose stored Project fails its sha256 check (nothing is written; rebuild) |
+| `CURSOR_SEMANTICS_MISMATCH` | 4 | cursor from a reader with other query code or vocabulary (`cursor_reader`, `reader`); restart without it |
+| `INDEX_UNAVAILABLE` | 5 | no usable index (`tried: [{source, path, problem}]`), including one built by other vocabulary or indexing code; or a damaged index whose stored Project (nothing is written) or evidence (`inspect --evidence`; nothing of it is shown) fails its sha256 check; rebuild |
 | `INDEX_IN_USE` | 5 | `index build` cannot replace an index another process holds open (Windows); a directory or read-only `--out` is `INVALID_REQUEST` instead |
 | `BUILD_FAILED` | 6 | error findings: `details.findings`, errors first, at most 50; the rest are counted in `findings_omitted` |
 | `INTERNAL` | 1 | unexpected failure; rerun with `OS_OPTICS_LENS_DEBUG=1` for a traceback on stderr |
@@ -646,6 +754,19 @@ os-optics-lens index dump --index build/os-optics-lens-index.sqlite > dump.json
   to explore a work-in-progress corpus, never to accept a batch.
 - `index dump` prints the canonical content of every table. Two indexes with the same
   `snapshot_id` and dump hold the same content, across platforms and Python versions.
+- A reader opens only an index built by the same vocabulary and index-producing code
+  ([Reader compatibility](INDEX_SCHEMA.md#reader-compatibility)); rebuild after upgrading.
+- Before merging an intake batch whose records live on other branches, verify the combined corpus
+  through the CLI:
+
+  ```
+  python scripts/verify_combined_intake.py --repo <clone> --phone-modules <ref> --phone-telephoto <ref>
+  ```
+
+  It assembles this tree's records with the two phone collections taken byte-exactly from the refs,
+  runs a strict validate and build, checks the `module_role` facet counts and role searches,
+  evidence inspection of every phone record and the Yutong fixture, and prints a JSON report with
+  the exact commits (exit 1 on a failed check).
 - An installed wheel can rebuild its own index from the bundled corpus and gets the same
   snapshot id:
   `os-optics-lens index build --corpus <site-packages>/os_optics_lens/_data/corpus --out rebuilt.sqlite`.
@@ -670,19 +791,19 @@ os-optics-lens index dump --index build/os-optics-lens-index.sqlite > dump.json
 ## Baseline timings
 
 Measured on 2026-11-26 on the development machine (Windows 10, CPython 3.13.5, SQLite 3.45.3) with
-the 41-record corpus (41 configurations, 1142 facts, index 2.1 MB, snapshot `db03814630c2a339`).
+the 41-record corpus (41 configurations, 1103 facts, index 2.1 MB, snapshot `0262201eaf2c8e3c`).
 Library figures are the median of repeated in-process calls on a freshly opened index; command
 figures are the median wall time of a whole `os-optics-lens` process, most of which is interpreter
 start-up and module import.
 
 | Operation | In-process | Whole command |
 |---|---|---|
-| `index build` (41 records) | 0.18 s | 0.42 s |
+| `index build` (41 records) | 0.20 s | 0.42 s |
 | `facets` | 3 ms | 0.18-0.25 s |
 | `fields` | 12 ms | 0.25 s |
 | `search --fixture` (specification, 16 constraints, `detail: full`, 11 KB out) | 4 ms | 0.19-0.25 s |
 | starting-point search over all records (EFL target, image-circle constraint, 15 KB out) | 12 ms | 0.26 s |
-| batch of 4 queries over all records (64 KB budget) | 32 ms | - |
+| batch of 4 queries over all records (64 KB budget) | 25 ms | - |
 | `inspect` (P2b) | 3 ms | 0.19-0.25 s |
 | `compare` (3 records) | 2 ms | - |
 | `project --out` | - | 0.25 s |

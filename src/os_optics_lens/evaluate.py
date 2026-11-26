@@ -78,6 +78,7 @@ CONDITIONS_DIFFER = "CONDITIONS_DIFFER"
 AMBIGUOUS_FACTS = "AMBIGUOUS_FACTS"
 DISCOVERY_ONLY = "DISCOVERY_ONLY"
 SAMPLING_DIFFERS = "SAMPLING_DIFFERS"
+SAMPLING_UNSPECIFIED = "SAMPLING_UNSPECIFIED"
 EVIDENCE_MISSING = "EVIDENCE_MISSING"
 EVIDENCE_UNRESOLVED = "EVIDENCE_UNRESOLVED"
 VALUE_MISSING = "VALUE_MISSING"
@@ -88,8 +89,8 @@ COMPARISON_ONLY = "COMPARISON_ONLY"
 
 REASON_CODES = frozenset({
     STOP_NOT_ELIGIBLE, STOP_MATCH_NOT_SUPPORTED, FACT_MISSING, CONDITIONS_DIFFER, AMBIGUOUS_FACTS,
-    DISCOVERY_ONLY, SAMPLING_DIFFERS, EVIDENCE_MISSING, EVIDENCE_UNRESOLVED, VALUE_MISSING,
-    VALUE_TYPE, COVERAGE_UNCONFIRMED, PREFERENCE_NOT_COMPARABLE, COMPARISON_ONLY,
+    DISCOVERY_ONLY, SAMPLING_DIFFERS, SAMPLING_UNSPECIFIED, EVIDENCE_MISSING, EVIDENCE_UNRESOLVED,
+    VALUE_MISSING, VALUE_TYPE, COVERAGE_UNCONFIRMED, PREFERENCE_NOT_COMPARABLE, COMPARISON_ONLY,
 })
 
 OPERATORS = (
@@ -114,7 +115,12 @@ _COVERAGE_KEY = ("spectrum", "continuous_coverage_nm")
 _CONFIRMED_COVERAGE_STATES = frozenset({"CONFIRMED", "SOURCE_STATED"})
 _VALUE_MEMBER = re.compile(r"^value(_[a-z_]+)?$")
 _FACT_SYNTAX = re.compile(r"^[^.\s]+(\.[^.\s]+)*$")
-_NOT_FACTS = frozenset({"engine_check", "property_list_comparison"})
+_NOT_FACTS = frozenset({
+    "catalog_comparisons", "engine_check", "prescription_dump_check", "property_list_comparison",
+})
+"""Provenance checks (docs/RECORD_FORMAT.md): agreement/comparison data kept beside the values,
+never a value. Mirrors `fact_extraction.check_members` in vocabulary.json."""
+_SAMPLING_MEMBER = "sampled_field_fractions"
 _UNPINNED_LIMIT = 6
 _UNPINNED_TEXT_CHARS = 80
 
@@ -130,9 +136,11 @@ _SHORTHAND_PREDICATE_KEYS = frozenset({"op", "value", "path", "tolerance"})
 _PREDICATE_KEYS = frozenset({"path", "op", "value", "tolerance"})
 _TARGET_KEYS = frozenset({
     "id", "fact", "target", "op", "tolerance", "relative_tolerance", "conditions", "weight",
-    "select", "path",
+    "select", "path", "required_sampled_field_fractions",
 })
-_PREFERENCE_KEYS = frozenset({"id", "fact", "direction", "conditions", "select", "path"})
+_PREFERENCE_KEYS = frozenset({
+    "id", "fact", "direction", "conditions", "select", "path", "required_sampled_field_fractions",
+})
 _FIXTURE_PREFERENCE_KEYS = frozenset({
     "id", "scope", "metric", "direction", "spherical_element_weight", "aspheric_element_weight",
     "scope_of_cost",
@@ -251,6 +259,17 @@ def json_equal(a: object, b: object) -> bool:
     return False
 
 
+def _finite_or_none(compute: Callable[[], Any]) -> float | None:
+    """`float(compute())` when it is a finite double, else None. Arithmetic on accepted finite
+    inputs can still overflow (a tiny limit, bounds near +/-1.7e308, big integers); an
+    unrepresentable result is reported as null, never as inf or an exception."""
+    try:
+        result = float(compute())
+    except (OverflowError, ZeroDivisionError):
+        return None
+    return result if math.isfinite(result) else None
+
+
 def canonical_value(value: object) -> object:
     """The value with integral floats normalized to int, so equal JSON values serialize alike."""
     if isinstance(value, float) and math.isfinite(value) and value.is_integer():
@@ -317,19 +336,43 @@ def proportional_weights(actual: object, expected: object) -> bool:
     )
 
 
-def _spectrum_equal(actual: object, expected: object) -> bool:
-    """Spectral conditions: same ordered wavelengths and proportional weights."""
-    return (isinstance(actual, dict)
-            and json_equal(actual.get("sampling_wavelengths_nm"),
-                           expected.get("sampling_wavelengths_nm"))  # type: ignore[union-attr]
-            and proportional_weights(actual.get("incident_weights"),
-                                     expected.get("incident_weights")))  # type: ignore[union-attr]
-
-
-def _condition_equal(key: str, actual: object, expected: object) -> bool:
-    if key == "spectrum" and isinstance(expected, dict) and "incident_weights" in expected:
-        return _spectrum_equal(actual, expected)
+def _member_equal(key: str, actual: object, expected: object) -> bool:
+    """One requested spectrum member against the stored one: incident weights compare by ratio
+    (over the same ordered wavelengths, which are compared as their own member), every other
+    member by JSON equality."""
+    if key == "incident_weights" and expected is not None:
+        return proportional_weights(actual, expected)
     return json_equal(actual, expected)
+
+
+def _difference(own: Mapping[str, Any], member: str, expected: object) -> dict[str, Any]:
+    """The difference detail of one requested member: an absent member says `present: false`,
+    a stored one (possibly an explicit null) shows its `actual` value."""
+    if member not in own:
+        return {"expected": expected, "present": False}
+    return {"expected": expected, "actual": own[member]}
+
+
+def _condition_differences(own: object, key: str, expected: object) -> list[tuple[str, dict[str, Any]]]:
+    """The mismatches of one requested condition against a fact's `conditions` object; empty when
+    it matches. A requested member must be PRESENT: an absent one never equals a requested null.
+    A dict-valued `spectrum` request is compared member by member (members it does not name stay
+    unpinned); mismatches are then listed as `spectrum.<member>`."""
+    if not isinstance(own, dict) or key not in own:
+        return [(key, {"expected": expected, "present": False})]
+    actual = own[key]
+    if key == "spectrum" and isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return [(key, {"expected": expected, "actual": actual})]
+        return [(f"{key}.{member}", _difference(actual, member, want))
+                for member, want in expected.items()
+                if member not in actual or not _member_equal(member, actual[member], want)]
+    return [] if json_equal(actual, expected) else [(key, {"expected": expected, "actual": actual})]
+
+
+def _conditions_match(own: object, conditions: Mapping[str, Any]) -> bool:
+    return isinstance(own, dict) and not any(
+        _condition_differences(own, key, expected) for key, expected in conditions.items())
 
 
 def _short(value: object, limit: int = _UNPINNED_TEXT_CHARS) -> object:
@@ -403,8 +446,8 @@ def _not_fact_hit(segments: Sequence[str], base: str = "") -> dict[str, Any] | N
         walked = f"{walked}.{segment}" if walked else segment
         if segment in _NOT_FACTS:
             return {"json_path": walked, "member": segment,
-                    "note": f"{segment} is a comparison-only check, never a value; it cannot satisfy "
-                            "or refute a constraint",
+                    "note": f"{segment} is a provenance check (comparison only), never a value; it "
+                            "cannot satisfy or refute a constraint",
                     "hint": "constrain the fact itself (see `fields`)"}
     return None
 
@@ -595,8 +638,16 @@ def _check_predicate_value(op: str, holder: Mapping[str, Any], pointer: str) -> 
 def _check_common(raw: Mapping[str, Any], pointer: str, *, metric_like: bool) -> None:
     if "id" in raw and (not isinstance(raw["id"], str) or not raw["id"]):
         raise _invalid("id must be a non-empty string", _ptr(pointer, "id"))
-    if "conditions" in raw and not isinstance(raw["conditions"], dict):
-        raise _invalid("conditions must be an object of key: expected value", _ptr(pointer, "conditions"))
+    if "conditions" in raw:
+        if not isinstance(raw["conditions"], dict):
+            raise _invalid("conditions must be an object of key: expected value", _ptr(pointer, "conditions"))
+        spectrum = raw["conditions"].get("spectrum")
+        if isinstance(spectrum, dict) and "incident_weights" in spectrum \
+                and "sampling_wavelengths_nm" not in spectrum:
+            raise _invalid("conditions.spectrum gives incident_weights without sampling_wavelengths_nm",
+                           _ptr(pointer, "conditions", "spectrum"),
+                           "weights are meaningless without their ordered wavelengths; add "
+                           "sampling_wavelengths_nm in the same order")
     if "select" in raw:
         select = raw["select"]
         if not isinstance(select, dict) or not select:
@@ -609,9 +660,10 @@ def _check_common(raw: Mapping[str, Any], pointer: str, *, metric_like: bool) ->
             raise _invalid(f"{flag} must be true or false", _ptr(pointer, flag))
     if "required_sampled_field_fractions" in raw:
         fractions = raw["required_sampled_field_fractions"]
-        if not isinstance(fractions, list) or not all(_is_number(v) for v in fractions):
-            raise _invalid("required_sampled_field_fractions must be a list of numbers",
-                           _ptr(pointer, "required_sampled_field_fractions"))
+        if not isinstance(fractions, list) or not fractions or not all(_is_number(v) for v in fractions):
+            raise _invalid("required_sampled_field_fractions must be a non-empty list of finite numbers",
+                           _ptr(pointer, "required_sampled_field_fractions"),
+                           "give the ordered field fractions, or omit the member")
 
 
 def _check_fact(fact: object, pointer: str) -> str:
@@ -671,7 +723,7 @@ def validate_constraint(raw: object, pointer: str) -> None:
 
 def validate_target(raw: object, pointer: str) -> None:
     """Validate one starting-point target `{id?, fact, target, op?: "near", tolerance?,
-    relative_tolerance?, conditions?, weight?, select?, path?}`."""
+    relative_tolerance?, conditions?, weight?, select?, path?, required_sampled_field_fractions?}`."""
     if not isinstance(raw, dict):
         raise _invalid("a target must be an object", pointer)
     _check_keys(raw, _TARGET_KEYS, pointer, "target")
@@ -702,8 +754,9 @@ def validate_target(raw: object, pointer: str) -> None:
 
 
 def validate_preference(raw: object, pointer: str) -> None:
-    """Validate one preference: `{fact, direction, conditions?, select?, path?}` or the fixture
-    `ranking_preference` form (recognized by scope + metric)."""
+    """Validate one preference: `{fact, direction, conditions?, select?, path?,
+    required_sampled_field_fractions?}` or the fixture `ranking_preference` form (recognized by
+    scope + metric)."""
     if not isinstance(raw, dict):
         raise _invalid("a preference must be an object", pointer)
     if raw.get("direction") not in _DIRECTIONS:
@@ -903,14 +956,14 @@ def _nearest_condition_details(candidates: Sequence[tuple[str, Any]],
     best_details: dict[str, Any] = {}
     for position, (path, fact) in enumerate(candidates):
         own = fact.get("conditions") if isinstance(fact, dict) else None
-        differs = {}
+        differs: dict[str, Any] = {}
         agreed = 0
         for key, expected in conditions.items():
-            actual = own.get(key) if isinstance(own, dict) else None
-            if isinstance(own, dict) and _condition_equal(key, actual, expected):
-                agreed += 1
+            found = _condition_differences(own, key, expected)
+            if found:
+                differs.update(found)
             else:
-                differs[key] = {"expected": expected, "actual": actual}
+                agreed += 1
         rank = (agreed, -position)
         if best is None or rank > best:
             best = rank
@@ -961,6 +1014,20 @@ def _discovery_hit(path: str, obj: object) -> dict[str, Any] | None:
     return None
 
 
+def _sampling_grid(fact: object) -> object:
+    """The sampling grid a resolved fact carries (`sampled_field_fractions`), or None."""
+    return fact.get(_SAMPLING_MEMBER) if isinstance(fact, dict) else None
+
+
+def _sampling_differs(fact: object, required: object) -> dict[str, Any] | None:
+    """§6.2 step 5: SAMPLING_DIFFERS details when the fact's grid is not the required one."""
+    if not isinstance(fact, dict) or _SAMPLING_MEMBER not in fact:
+        return {"expected": required, "present": False}
+    if json_equal(fact[_SAMPLING_MEMBER], required):
+        return None
+    return {"expected": required, "actual": fact[_SAMPLING_MEMBER]}
+
+
 def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
             sampling_and_evidence: bool) -> _Located:
     """Steps 1-6 of §6.2 (stop eligibility, scope, comparability, discovery-only, sampling,
@@ -972,7 +1039,11 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
     required = bool(c.get("requires_blocking_stop")) or \
         _prefix_stop_dependent(key_segments, ctx) is not None
     located = _Located(key_segments=key_segments, gate_required=required, stop=stop)
-    not_fact = _not_fact_hit(key_segments)
+    # Narrowing by a provenance check (select/conditions member) would let that data decide which
+    # fact is compared, so it is guarded like a path naming the check.
+    not_fact = (_not_fact_hit(key_segments)
+                or _not_fact_hit(list(c.get("select") or {}), "select")
+                or _not_fact_hit(list(c.get("conditions") or {}), "conditions"))
     if not_fact is not None:
         located.reason, located.details = COMPARISON_ONLY, not_fact
         return located
@@ -1003,6 +1074,8 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
                         if key in entry:
                             seen.setdefault(_canonical_text(entry[key]), entry[key])
                     available[key] = {"expected": select[key], "available": list(seen.values())[:10]}
+                    if not seen:
+                        available[key]["present"] = False
                 located.reason = CONDITIONS_DIFFER
                 located.details = {"select": available, "candidates": len(entries)}
                 return located
@@ -1021,8 +1094,7 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
     if conditions:
         comparable = [
             (path, fact) for path, fact in candidates
-            if isinstance(fact, dict) and isinstance(fact.get("conditions"), dict)
-            and all(_condition_equal(k, fact["conditions"].get(k), v) for k, v in conditions.items())
+            if isinstance(fact, dict) and _conditions_match(fact.get("conditions"), conditions)
         ]
     else:
         comparable = list(candidates)
@@ -1053,12 +1125,10 @@ def _locate(view: Mapping[str, Any], c: Mapping[str, Any], ctx: EvalContext, *,
     if not sampling_and_evidence:
         return located
     fact = located.fact
-    required_samples = c.get("required_sampled_field_fractions")
-    if required_samples is not None:
-        actual = fact.get("sampled_field_fractions") if isinstance(fact, dict) else None
-        if not json_equal(actual, required_samples):
-            located.reason = SAMPLING_DIFFERS
-            located.details = {"expected": required_samples, "actual": actual}
+    if "required_sampled_field_fractions" in c:
+        differs = _sampling_differs(fact, c["required_sampled_field_fractions"])
+        if differs is not None:
+            located.reason, located.details = SAMPLING_DIFFERS, differs
             return located
     if c.get("requires_evidence_source"):
         source = fact.get("source") if isinstance(fact, dict) else None
@@ -1094,7 +1164,7 @@ def _coverage_guard(view: Mapping[str, Any], full: Sequence[str]) -> dict[str, A
         return None
     coverage = _at(view, list(_COVERAGE_KEY))
     state = coverage.get("state") if isinstance(coverage, dict) else None
-    confirmed = (isinstance(coverage, dict) and state in _CONFIRMED_COVERAGE_STATES
+    confirmed = (isinstance(coverage, dict) and isinstance(state, str) and state in _CONFIRMED_COVERAGE_STATES
                  and _is_number(coverage.get("min_nm")) and _is_number(coverage.get("max_nm")))
     if confirmed:
         return None
@@ -1173,10 +1243,10 @@ def _value_unit(located: _Located, segments: Sequence[str], value: object) -> st
 
 def _numeric_shortfall(cid: str, json_path: str, value: float, limit: float, unit: str | None,
                        strict: bool = False) -> dict[str, Any]:
-    gap = float(abs(value - limit))
+    gap = _finite_or_none(lambda: abs(value - limit))
     out: dict[str, Any] = {
         "constraint": cid, "path": json_path, "value": value, "limit": limit, "shortfall": gap,
-        "relative": gap / abs(limit) if limit != 0 else None,
+        "relative": _finite_or_none(lambda: gap / abs(limit)) if gap is not None and limit != 0 else None,
     }
     if unit is not None:
         out["unit"] = unit
@@ -1280,12 +1350,12 @@ def _evaluate_predicate(view: Mapping[str, Any], located: _Located, predicate: M
             outcome = MATCH
         else:
             outcome = DOES_NOT_MATCH
-            gap = float(max(0.0, low - want_low) + max(0.0, want_high - high))
-            width = want_high - want_low
+            gap = _finite_or_none(lambda: max(0, low - want_low) + max(0, want_high - high))
+            width = _finite_or_none(lambda: want_high - want_low)
             result.shortfall = {
                 "constraint": cid, "path": json_path, "value": [low, high],
                 "limit": [want_low, want_high], "shortfall": gap,
-                "relative": gap / width if width else None,
+                "relative": _finite_or_none(lambda: gap / width) if gap is not None and width else None,
             }
             unit = _value_unit(located, segments, low)
             if unit is not None:
@@ -1353,6 +1423,8 @@ def _fact_info(view: Mapping[str, Any], located: _Located, results: Sequence[_Pr
         info["values"] = {r.path: r.value for r in results}
     info["basis"] = _basis(view, located, first if len(results) == 1 else [])
     if isinstance(fact, dict):
+        if _sampling_grid(fact) is not None:
+            info[_SAMPLING_MEMBER] = fact[_SAMPLING_MEMBER]
         if isinstance(fact.get("conditions"), dict):
             info["conditions"] = fact["conditions"]
         elif isinstance(fact.get("conditions"), str):
@@ -1367,15 +1439,26 @@ def _fact_info(view: Mapping[str, Any], located: _Located, results: Sequence[_Pr
     return info
 
 
-def _unpinned(fact: object, conditions: Mapping[str, Any]) -> dict[str, Any]:
-    """Condition keys of the matched fact the constraint did not pin (amendment 10.11)."""
+def _unpinned(fact: object, constraint: Mapping[str, Any]) -> dict[str, Any]:
+    """Comparison conditions of the matched fact the constraint did not pin (amendment 10.11):
+    prose conditions, the sampling grid, condition keys and the members of a partly pinned
+    `spectrum`."""
     if not isinstance(fact, dict):
         return {}
+    conditions = constraint.get("conditions") or {}
     own = fact.get("conditions")
     items: list[tuple[str, Any]] = []
     if isinstance(own, str):
         items.append(("_text", _short(own)))
-    elif isinstance(own, dict):
+    # The sampling grid and the unrequested members of a partly pinned spectrum come first, so the
+    # limit never hides them.
+    if _sampling_grid(fact) is not None and "required_sampled_field_fractions" not in constraint:
+        items.append((_SAMPLING_MEMBER, _short(fact[_SAMPLING_MEMBER])))
+    if isinstance(own, dict):
+        wanted, stored = conditions.get("spectrum"), own.get("spectrum")
+        if isinstance(wanted, dict) and isinstance(stored, dict):
+            items.extend((f"spectrum.{member}", _short(stored[member]))
+                         for member in sorted(stored) if member not in wanted)
         items.extend((key, _short(own[key])) for key in sorted(own) if key not in conditions)
     if len(items) > _UNPINNED_LIMIT:
         kept = items[: _UNPINNED_LIMIT - 1]
@@ -1433,7 +1516,7 @@ def evaluate_constraint(view: Mapping[str, Any], constraint: Mapping[str, Any], 
         if missing:
             out["details"] = missing[0] if len(missing) == 1 else {"predicates": missing}
     if out["outcome"] == MATCH:
-        unpinned = _unpinned(located.fact, c.get("conditions") or {})
+        unpinned = _unpinned(located.fact, c)
         if unpinned:
             out["unpinned"] = unpinned
     if detail:
@@ -1481,6 +1564,13 @@ def configuration_rank(evaluation: Mapping[str, Any], ordinal: int) -> tuple[int
 # Targets and preferences (§6.5, amendment 10.9)
 
 
+def _unspecified_grid(fact: object) -> dict[str, Any]:
+    """SAMPLING_UNSPECIFIED details: a sampled value is comparable only on a stated grid, so
+    values from different grids are never ranked together silently."""
+    return {"actual": _sampling_grid(fact),
+            "hint": "pin required_sampled_field_fractions in the target or shorthand preference"}
+
+
 def _single_numeric(view: Mapping[str, Any], spec: Mapping[str, Any], ctx: EvalContext,
                     pointer: str | None) -> tuple[float | None, str | None, dict[str, Any]]:
     """Steps 1-6 with eligibility only, then exactly one comparable finite number."""
@@ -1501,6 +1591,14 @@ def _single_numeric(view: Mapping[str, Any], spec: Mapping[str, Any], ctx: EvalC
         if located.details:
             info["details"] = located.details
         return None, located.reason, info
+    if "required_sampled_field_fractions" in spec:
+        differs = _sampling_differs(located.fact, spec["required_sampled_field_fractions"])
+        if differs is not None:
+            info["details"] = differs
+            return None, SAMPLING_DIFFERS, info
+    elif _sampling_grid(located.fact) is not None:
+        info["details"] = _unspecified_grid(located.fact)
+        return None, SAMPLING_UNSPECIFIED, info
     path = c["predicates"][0]["path"]
     segments = _split(path)
     reason, details, _ = _path_guards(view, located, segments, ctx)
@@ -1543,7 +1641,8 @@ def target_scale(target: Mapping[str, Any]) -> tuple[float, str]:
     if target.get("tolerance") is not None:
         return float(target["tolerance"]), "tolerance"
     if target.get("relative_tolerance") is not None and goal != 0:
-        return float(target["relative_tolerance"] * abs(goal)), "relative_tolerance"
+        scale = _finite_or_none(lambda: target["relative_tolerance"] * abs(goal))
+        return math.inf if scale is None else scale, "relative_tolerance"
     if goal != 0:
         return float(abs(goal)), "target"
     return 1.0, "absolute"
@@ -1559,20 +1658,20 @@ def target_deviation(value: float, target: Mapping[str, Any], *,
     ranking value must be a finite number).
     """
     goal = target["target"]
-    deviation = abs(value - goal)
+    deviation = _finite_or_none(lambda: abs(value - goal))
     scale, basis = target_scale(target)
     if not (math.isfinite(scale) and scale >= sys.float_info.min):
         raise RequestError("INVALID_REQUEST", f"the target scale ({basis}) must be a normal positive "
                            "number", pointer=pointer, hint="give a larger tolerance",
                            details={"scale_basis": basis})
-    normalized = float(deviation) / scale if math.isfinite(deviation) else math.inf
-    if not math.isfinite(normalized):
+    normalized = None if deviation is None else _finite_or_none(lambda: deviation / scale)
+    if normalized is None:
         raise RequestError("INVALID_REQUEST", f"the normalized deviation of {target.get('fact')} "
-                           f"({deviation!r} / {scale!r}) is not a finite number", pointer=pointer,
+                           f"({'overflow' if deviation is None else repr(deviation)} / {scale!r}) "
+                           "is not a finite number", pointer=pointer,
                            hint="give a larger tolerance or relative_tolerance",
-                           details={"deviation": float(deviation) if math.isfinite(deviation) else None,
-                                    "scale": scale, "scale_basis": basis})
-    return {"value": value, "target": goal, "deviation": float(deviation), "scale": scale,
+                           details={"deviation": deviation, "scale": scale, "scale_basis": basis})
+    return {"value": value, "target": goal, "deviation": deviation, "scale": scale,
             "scale_basis": basis, "normalized": normalized}
 
 
@@ -1580,7 +1679,8 @@ def preference_value(view: Mapping[str, Any], preference: Mapping[str, Any], ctx
                      pointer: str | None = None) -> tuple[float | None, str | None, dict[str, Any]]:
     """The value a preference ranks by, or an unknown with its reason.
 
-    Shorthand `{fact, direction, conditions?, select?, path?}` resolves like a target. The fixture
+    Shorthand `{fact, direction, conditions?, select?, path?, required_sampled_field_fractions?}`
+    resolves like a target. The fixture
     form `{scope, metric, direction, <pins>}` takes `view[scope][metric]` only when every pin equals
     the cost object's member (`scope_of_cost` pins the object's `scope`); otherwise
     PREFERENCE_NOT_COMPARABLE with per-pin expected/actual.
@@ -1621,12 +1721,15 @@ def preference_value(view: Mapping[str, Any], preference: Mapping[str, Any], ctx
         if key in ("id", "scope", "metric", "direction"):
             continue
         member = _PREFERENCE_PIN_TARGETS.get(key, key)
-        actual = obj.get(member)
-        if actual is None or not json_equal(actual, expected):
-            differs[key] = {"expected": expected, "actual": actual}
+        if member not in obj or not json_equal(obj[member], expected):
+            differs[key] = _difference(obj, member, expected)
     if differs:
         info["details"] = {"differs": differs}
         return None, PREFERENCE_NOT_COMPARABLE, info
+    if _sampling_grid(obj) is not None:
+        # The fixture form cannot pin a grid, so a sampled value is never ranked by it.
+        info["details"] = _unspecified_grid(obj)
+        return None, SAMPLING_UNSPECIFIED, info
     value = obj.get(metric)
     info["unit"] = unit_for_name(metric)
     info["basis"] = obj.get("basis") if isinstance(obj.get("basis"), str) else None

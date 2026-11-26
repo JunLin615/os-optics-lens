@@ -20,6 +20,7 @@ replacing spaces and hyphens with underscores, and accept aliases.
 | `conjugate` | configuration | infinite_to_finite, finite_to_finite, ... |
 | `field_kind` | configuration | how the design states its field: angular, object height or image height |
 | `system_aperture` | configuration | the aperture fact the design file declares (f_number, entrance_pupil_diameter_mm, ...) |
+| `module_role` | record | where a phone module sits in its device (design.module_role): main_camera, ultrawide, telephoto, front_camera; not what the prescription is. Another record value is indexed verbatim (UNKNOWN_TERM) and filters match it exactly |
 | `stop_state` | record | stop_blocking, stop_not_blocking or no_stop (design.aperture_validity.state) |
 | `evidence` | configuration | performance metrics and studies present (mtf, mtf_field_minimum, cra, relative_illumination, tolerance_study, ...) |
 | `validation` | record | paraxial_matched, field_verified, project_accepted |
@@ -38,6 +39,7 @@ configuration of the record.
 | apsc | image_format | aps_c |
 | vis, nir, uv, mwir, lwir | band | visible, near_infrared, ultraviolet, mid_wave_infrared, long_wave_infrared |
 | infinity | conjugate | infinite_to_finite |
+| main, ultra_wide, tele, front | module_role | main_camera, ultrawide, telephoto, front_camera |
 
 A vocabulary term with no records in the index is not an error: the result is empty with warning
 `FACET_VALUE_EMPTY`. A value that is neither a term nor present is `UNKNOWN_FACET_VALUE` with
@@ -61,4 +63,5 @@ Examples:
 os-optics-lens facets --facet design_type --facet structure
 os-optics-lens facets --filter design_type=camera_lens --filter image_format=ff --facet family
 os-optics-lens search --mode starting_point --filter application=smartphone --prefer first_order.total_track_mm
+os-optics-lens search --mode starting_point --filter module_role=tele --target first_order.effective_focal_length_mm=7~1.5
 ```

@@ -62,8 +62,12 @@ Shorthand (recommended):
 * An interval fact (min_/max_ pair) needs an explicit `path`; `covers_interval` takes the
   interval itself.
 * `conditions` pins condition members by JSON value equality, e.g.
-  `{"frequency_lp_mm": 40, "spectrum": {...}}`. Condition keys you leave out are reported as
-  `unpinned` on a MATCH.
+  `{"frequency_lp_mm": 40, "spectrum": {...}}`. Every pinned member must be present in the fact
+  (an absent member never equals `null`). A `spectrum` object is compared member by member, with
+  `incident_weights` by ratio; weights need their `sampling_wavelengths_nm`. Condition keys (and
+  spectrum members) you leave out are reported as `unpinned` on a MATCH.
+* `required_sampled_field_fractions` is a non-empty list of numbers that must equal the fact's
+  `sampled_field_fractions` in order (`SAMPLING_DIFFERS`). `null` or `[]` is `INVALID_REQUEST`.
 * `select` narrows performance entries by top-level members before conditions are compared,
   e.g. `{"select": {"frequency_lp_mm": 30, "image_height_mm": 12.0, "direction": "sagittal"}}`.
 * `id` defaults to `c0`, `c1`, ... ; ids must be unique.
@@ -97,19 +101,22 @@ An unknown operator is `UNSUPPORTED_OPERATOR`.
 ```
 {"id"?: "t0", "fact": "first_order.effective_focal_length_mm", "target": 24,
  "op"?: "near", "tolerance"?: 3, "relative_tolerance"?: 0.15, "conditions"?, "select"?, "path"?,
- "weight"?: 1}
+ "required_sampled_field_fractions"?, "weight"?: 1}
 ```
 
 `normalized = |value - target| / scale`; scale = `tolerance`, else `relative_tolerance * |target|`,
 else `|target|`, else 1. The scale must be a normal positive number, and a normalized deviation
 or weighted score (sum of `weight * normalized`) that is not finite is `INVALID_REQUEST`. A target
 needs exactly one comparable numeric value, otherwise it is an unknown with a reason code. Interval
-facts cannot be targets.
+facts cannot be targets. A value with a sampling grid is unknown `SAMPLING_UNSPECIFIED` unless the
+target pins it with `required_sampled_field_fractions` (a different grid is `SAMPLING_DIFFERS`).
+Provenance checks (`help semantics`) cannot be targets or preferences.
 
 ## Preferences
 
 Always a list, applied in order: `[{"fact": "design.powered_element_count", "direction":
-"ascending" | "descending", "conditions"?, "select"?, "path"?}]`. The fixture's cost form is
+"ascending" | "descending", "conditions"?, "select"?, "path"?,
+"required_sampled_field_fractions"?}]` (the same grid rule as targets). The fixture's cost form is
 accepted verbatim: `{"scope": ["cost_proxy"], "metric": "weighted_spherical_element_count",
 "spherical_element_weight": 1, "aspheric_element_weight": 3, "scope_of_cost": "...", "direction":
 "ascending"}`; a record whose cost weights or scope differ is `PREFERENCE_NOT_COMPARABLE`.
@@ -131,7 +138,9 @@ last.
 When `page.next_cursor` is a string, send the same query (same mode, filters, constraints,
 targets, preferences, include, hard_shortfall) with `"cursor": "<next_cursor>"` (or
 `--cursor`). `limit`, `fields` and `detail` may change between pages. A cursor from another
-index snapshot is `SNAPSHOT_MISMATCH`; from another query, `CURSOR_MISMATCH`.
+index snapshot is `SNAPSHOT_MISMATCH`; from another query, `CURSOR_MISMATCH`; from a reader with
+other query code or vocabulary (after an upgrade), `CURSOR_SEMANTICS_MISMATCH`, and a version 1
+cursor is `CURSOR_INVALID`: then restart without a cursor.
 
 ## Quick flags (CLI)
 
@@ -149,9 +158,14 @@ index snapshot is `SNAPSHOT_MISMATCH`; from another query, `CURSOR_MISMATCH`.
 | `--include MATCH,UNCONFIRMED` | `include` |
 | `--hard-shortfall allow` | `hard_shortfall` |
 
+The quick flags cannot pin a sampling grid; for `--target`/`--prefer` on a sampled value (such as
+`performance.mtf_field_minimum`) write the request and pass `--request FILE` with
+`required_sampled_field_fractions`.
+
 `--fields`, `--detail`, `--limit`, `--cursor` and `--max-output-bytes` also combine with a
 single-query `--request FILE`. `--fixture FILE` runs an acceptance fixture (specification mode,
 its record id, its constraints and ranking preference, detail full). `--explain-request` prints
 the normalized request and its `query_digest` without searching; a cursor is checked as the
-search would check it (`CURSOR_INVALID`, `CURSOR_MISMATCH`, `SNAPSHOT_MISMATCH`) and its offset is
-echoed as `options.cursor_offset`.
+search would check it (`CURSOR_INVALID`, `CURSOR_SEMANTICS_MISMATCH`, `SNAPSHOT_MISMATCH`,
+`CURSOR_MISMATCH`) and its offset is echoed as `options.cursor_offset`. The explanation obeys the
+same byte budget as the search (`--max-output-bytes`, else the request's `max_output_bytes`).

@@ -25,6 +25,8 @@ Steps (each one is a check in the JSON report printed on stdout):
    snapshot), ``facets``, ``search`` (a starting-point request read from a file),
    ``inspect`` (``yutong-2025-mirrorless-18-p2b``, ASCII JSON on the piped stdout), ``project_out``
    (``project --out``; the file's SHA-256 equals the record's ``native_project.sha256``),
+   ``inspect_evidence`` (``inspect --evidence back_focus`` of the same record returns that section
+   of its bundled evidence extract, with every evidence reference RESOLVED),
    ``search_fixture`` (acceptance item (1) of spec §9 against the bundled index and the bundled
    acceptance file, amendment 9.4: ``search --fixture`` returns the fixture's record at revision 4
    (the fixture's revision) as MATCH with counts.MATCH equal to the confirmed constraints and every
@@ -58,6 +60,8 @@ DATA = f"{PACKAGE}/_data"
 CORPUS = f"{DATA}/corpus"
 INSPECT_RECORD = "yutong-2025-mirrorless-18-p2b"
 FIXTURE = "acceptance/yutong-2025-mirrorless-problem-2.json"
+EVIDENCE_PATH = f"records/yutong-cup/{INSPECT_RECORD}/evidence.json"
+EVIDENCE_SECTION = "back_focus"
 ACCEPTANCE_REVISION = 4
 """Acceptance item (1): the fixture's record is found at revision 4."""
 RESOLVED_EVIDENCE_CONSTRAINTS = ("mtf_0_to_0p8", "corner_relative_illumination")
@@ -257,6 +261,24 @@ def acceptance_failures(fixture: dict[str, Any], candidate: dict[str, Any], grid
     if not isinstance(grid, list) or len(grid) != SAMPLED_GRID_SIZE or grid != required:
         failures.append(f"{SAMPLED_GRID_FACT} sampled_field_fractions {grid!r}, expected the "
                         f"{SAMPLED_GRID_SIZE}-sample grid {required!r}")
+    return failures
+
+
+def evidence_failures(extract: dict[str, Any], doc: Any) -> list[str]:
+    """What is wrong with an ``inspect --evidence`` response for the bundled extract."""
+    result = doc.get("result") if isinstance(doc, dict) else None
+    if not isinstance(result, dict):
+        return ["inspect --evidence returned no result"]
+    failures: list[str] = []
+    section = (extract.get("sections") or {}).get(EVIDENCE_SECTION)
+    entry = (result.get("evidence_sections") or {}).get(EVIDENCE_PATH)
+    returned = entry.get("sections") if isinstance(entry, dict) else None
+    if not section or returned != {EVIDENCE_SECTION: section}:
+        failures.append(f"inspect --evidence did not return the {EVIDENCE_SECTION} content of {EVIDENCE_PATH}")
+    statuses = sorted({ref.get("status") for ref in (result.get("evidence") or {}).get("refs") or []
+                       if ref.get("path") == EVIDENCE_PATH})
+    if statuses != ["RESOLVED"]:
+        failures.append(f"evidence reference statuses {statuses!r}, expected ['RESOLVED']")
     return failures
 
 
@@ -508,6 +530,19 @@ def run_installed_checks(report: Report, run_dir: Path, venv: Path, facts: dict[
                 check.fail(f"response {key} {reported} != native_project.sha256 {expected}")
     check.ok = True
 
+    check = report.start("inspect_evidence")
+    doc = runner.json_command(check, [cli, "inspect", INSPECT_RECORD, "--evidence", EVIDENCE_SECTION,
+                                      "--max-output-bytes", "262144"])
+    try:
+        extract = json.loads((package_dir / "_data" / "corpus" / EVIDENCE_PATH).read_bytes())
+    except (OSError, ValueError) as exc:
+        check.fail(f"cannot read the bundled extract {EVIDENCE_PATH}: {exc}")
+    else:
+        check.info["section"] = EVIDENCE_SECTION
+        for problem in evidence_failures(extract, doc):
+            check.fail(problem)
+    check.ok = True
+
     check = report.start("search_fixture")
     fixture_path = package_dir / "_data" / "corpus" / FIXTURE
     fixture = facts.get("fixture") or {}
@@ -594,7 +629,8 @@ def main(argv: list[str] | None = None) -> int:
             f"create {scratch}/verify-*/venv with {'uv venv' if uv else 'python -m venv'} ({args.python})",
             "install the wheel with --no-index --no-deps",
             "run network_blocked, import_location, info, python_m_info, facets, search, inspect, "
-            "project_out, search_fixture, index_rebuild from an empty directory with sockets disabled",
+            "project_out, inspect_evidence, search_fixture, index_rebuild from an empty directory with "
+            "sockets disabled",
         ]
     elif report.ok:
         scratch.mkdir(parents=True, exist_ok=True)

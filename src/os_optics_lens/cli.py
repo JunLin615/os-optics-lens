@@ -249,10 +249,12 @@ def build_parser() -> JsonArgumentParser:
          f"{PROG} inspect lenslibrary-528155 --prescription summary"])
     p.add_argument("record_id", metavar="RECORD_ID")
     p.add_argument("--revision", type=int, metavar="N", help="fail unless the index holds this revision")
-    p.add_argument("--configuration", metavar="ID", help="native configuration id (default: the first)")
+    p.add_argument("--configuration", metavar="ID",
+                   help="native configuration id (default: the first; evidence then covers every configuration)")
     p.add_argument("--fields", action="append", metavar="K1,K2", help="fact keys or prefixes to show in full")
     p.add_argument("--sections", action="append", metavar="S1,S2", help="whole view sections (e.g. spectrum)")
-    p.add_argument("--evidence", action="append", metavar="S|all", help="evidence sections by name, or all")
+    p.add_argument("--evidence", action="append", metavar="S|PATH#S|all",
+                   help="evidence sections by name, path#section, or all")
     p.add_argument("--prescription", choices=query.PRESCRIPTION_LEVELS, help="native Project optical model")
     _budget_option(p)
     p.set_defaults(handler=_cmd_inspect)

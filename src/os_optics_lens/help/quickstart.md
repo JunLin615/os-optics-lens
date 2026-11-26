@@ -65,7 +65,8 @@ os-optics-lens compare lenslibrary-528155 yutong-2025-mirrorless-18-p2b \
   --fields first_order.effective_focal_length_mm,aperture.f_number
 ```
 
-Rows with `comparable: false` name what differs (`differs_by`: unit, conditions, qualifiers).
+Rows with `comparable: false` name what differs (`differs_by`: unit, conditions, qualifiers,
+sampled_field_fractions).
 
 ## 5. Inspect one record
 

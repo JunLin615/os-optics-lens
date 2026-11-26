@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator, Sequence
 
 from . import output
+from .canonical import corpus_relative_path
 from .errors import LensError
 from .evaluate import (
     DOES_NOT_MATCH,
@@ -55,6 +56,7 @@ from .evaluate import (
     validate_preferences,
     validate_target,
 )
+from .normalize import iter_source_refs
 from .store import Index
 from .vocabulary import Vocabulary, load_vocabulary
 
@@ -104,6 +106,9 @@ _RANGE_KEYS = frozenset({"fact", "min", "max"})
 _EXCLUDED_STAGES = ("filters", "missing_fact", "out_of_range")
 _VALUE_MEMBER = re.compile(r"^value(_[a-z_]+)?$")
 _INDEX_SEGMENT = re.compile(r"^([^\[\]]+)((?:\[\d+\])*)$")
+_ENTRY_REF_FIELD = re.compile(r"^configurations\[(\d+)\]\.")
+# Checks that compare a whole section's source table: shown with every fact of the section.
+_SECTION_WIDE_CHECKS = frozenset({"prescription_dump_check"})
 _LICENSE_PATH = re.compile(r"\b(licenses/[A-Za-z0-9._-]+|LICENSE)\b")
 
 _FIELD_CANDIDATES = ("field.half_field_deg", "field.max_image_height_mm", "field.max_object_height_mm")
@@ -285,9 +290,26 @@ class _Session:
             hint=("did you mean " + ", ".join(close) + "?") if close else "list fact keys with `os-optics-lens fields`",
             details={"pointer": pointer, "fact": key, "did_you_mean": close})
 
+    def reject_check(self, key: Any, pointer: str) -> None:
+        """A name (fact key or predicate path) that reaches a provenance check is an error: checks
+        compare source data and can be neither matched nor ranked."""
+        if not isinstance(key, str):
+            return
+        members = self.vocab.fact_extraction.get("check_members", [])
+        member = next((segment for segment in key.split(".") if segment in members), None)
+        if member is None:
+            return
+        raise LensError(
+            "UNKNOWN_FIELD", f"{_short_text(key)!r} names {member}, a provenance check, not a fact",
+            hint=f"{member} is a provenance check that cannot be matched or ranked; read it under `checks` "
+                 "with `os-optics-lens inspect <record_id> --fields <fact_key>` (or in `--sections`).",
+            details={"pointer": pointer, "fact": _short_text(key), "provenance_check": member,
+                     "did_you_mean": []})
+
     def require_fact(self, key: Any, pointer: str) -> str:
         if not isinstance(key, str) or not key:
             raise _invalid("fact must be a dotted fact key", pointer)
+        self.reject_check(key, pointer)
         if not self.is_known_fact(key):
             raise self.unknown_field(key, pointer)
         return key
@@ -387,6 +409,8 @@ def _resolve_facet_value(s: _Session, facet: str, value: str, pointer: str,
     present = s.facet_values(facet)
     if term in present:
         return term
+    if value in present:  # a record value outside the vocabulary is indexed verbatim (module_role)
+        return value
     if s.vocab.is_known_term(facet, term):
         warnings.append({"code": "FACET_VALUE_EMPTY", "pointer": pointer, "facet": facet, "value": term,
                          "message": f"no indexed record has {facet} {term!r}"})
@@ -645,6 +669,7 @@ def _normalize_query(s: _Session, raw: Any, base: str, warnings: list[dict[str, 
         with _request_errors():
             validate_target(item, _ptr(tptr, i))
         s.require_fact(item["fact"], _ptr(tptr, i, "fact"))
+        s.reject_check(item.get("path"), _ptr(tptr, i, "path"))
         _reject_interval(s, item, _ptr(tptr, i), "target", allow_cover=False)
         target = copy.deepcopy(item)
         target.setdefault("id", f"t{i}")
@@ -663,6 +688,7 @@ def _normalize_query(s: _Session, raw: Any, base: str, warnings: list[dict[str, 
         key = ".".join(list(item["scope"]) + [item["metric"]]) if is_fixture_preference(item) else item["fact"]
         s.require_fact(key, _ptr(pptr, i, "metric" if is_fixture_preference(item) else "fact"))
         if not is_fixture_preference(item):
+            s.reject_check(item.get("path"), _ptr(pptr, i, "path"))
             _reject_interval(s, item, _ptr(pptr, i), "preference", allow_cover=False)
         preference = copy.deepcopy(item)
         preference.setdefault("id", f"p{i}")
@@ -1191,21 +1217,29 @@ def run_request(index: Index, request: Any, *, max_output_bytes: int | None = No
     if not isinstance(request, dict):
         raise _invalid("the request must be a JSON object", "/")
     if "queries" in request:
-        return _run_batch(s, request, max_output_bytes)
+        budget = _budget(request.get("max_output_bytes"), max_output_bytes, "/max_output_bytes")
+        with _bounded_errors(budget):
+            return _run_batch(s, request, budget)
     budget = _budget(request.get("max_output_bytes"), max_output_bytes, "/max_output_bytes")
     warnings: list[dict[str, Any]] = []
-    try:
+    with _bounded_errors(budget):
         prepared = _prepare_query(s, request, "", warnings)
+        response = _envelope(s, {"result": prepared.result}, warnings)
+        return output.fill_pages(response, [_slot(s, prepared, None)], budget)
+
+
+@contextmanager
+def _bounded_errors(budget: int) -> Iterator[None]:
+    """Mark a failure with the request's byte budget: the CLI bounds the error envelope by it."""
+    try:
+        yield
     except LensError as error:
-        error.output_budget = budget  # the CLI bounds the error envelope by the request's budget
+        error.output_budget = budget
         raise
-    response = _envelope(s, {"result": prepared.result}, warnings)
-    return output.fill_pages(response, [_slot(s, prepared, None)], budget)
 
 
-def _run_batch(s: _Session, request: dict[str, Any], argument: int | None) -> dict[str, Any]:
+def _run_batch(s: _Session, request: dict[str, Any], budget: int) -> dict[str, Any]:
     _check_keys(request, _BATCH_KEYS, "", "batch request")
-    budget = _budget(request.get("max_output_bytes"), argument, "/max_output_bytes")
     queries = request["queries"]
     if not isinstance(queries, list) or not queries or len(queries) > MAX_BATCH_QUERIES:
         raise _invalid(f"queries must be a list of 1 to {MAX_BATCH_QUERIES} queries", "/queries",
@@ -1271,11 +1305,16 @@ def normalize_request(index: Index, request: Any) -> dict[str, Any]:
 
 
 def explain_request(index: Index, request: Any, *, max_output_bytes: int | None = None) -> dict[str, Any]:
-    """Response envelope echoing `normalize_request` (for `--explain-request`)."""
+    """Response envelope echoing `normalize_request` (for `--explain-request`), bounded like the
+    search: by `max_output_bytes` (the argument), else the request's own member, else 32768. An
+    explanation that does not fit raises OUTPUT_LIMIT_EXCEEDED (details.required_bytes)."""
     s = _Session(index)
-    result = normalize_request(index, request)
-    budget = output.check_max_output_bytes(max_output_bytes, "max_output_bytes")
-    return output.finalize(_envelope(s, {"result": result}, []), budget)
+    if not isinstance(request, dict):
+        raise _invalid("the request must be a JSON object", "/")
+    budget = _budget(request.get("max_output_bytes"), max_output_bytes, "/max_output_bytes")
+    with _bounded_errors(budget):
+        result = normalize_request(index, request)
+        return output.finalize(_envelope(s, {"result": result}, []), budget)
 
 
 def fixture_to_request(case: dict[str, Any]) -> dict[str, Any]:
@@ -1377,17 +1416,22 @@ def _one_or_list(values: Sequence[Any]) -> Any:
     return distinct[0] if len(distinct) == 1 else distinct
 
 
+def _variant(row: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
+    """What makes two values of a fact key comparable: conditions, qualifiers and sampling grid."""
+    return row["conditions_json"], row["qualifiers_json"], row["sampled_field_fractions_json"]
+
+
 def _field_summary(s: _Session, key: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     numbers = [r["value_num"] for r in rows if r["value_num"] is not None]
     numbers += [v for r in rows for v in (r["value_min"], r["value_max"]) if v is not None]
-    variants = {(r["conditions_json"], r["qualifiers_json"]) for r in rows}
+    variants = {_variant(r) for r in rows}
     condition_keys = sorted({k for r in rows if r["conditions_json"] for k in json.loads(r["conditions_json"])})
     return {
         "records": len({r["record_pk"] for r in rows}),
         "unit": _one_or_list([r["unit"] for r in rows if r["unit"] is not None]),
         "value_type": _one_or_list([_row_type(r) for r in rows]),
         "bases": sorted({r["basis_class"] for r in rows if r["basis_class"] is not None}),
-        "condition_variants": len(variants) if variants != {(None, None)} else 0,
+        "condition_variants": len(variants) if variants != {(None, None, None)} else 0,
         "conditions_keys": condition_keys,
         "min": min(numbers) if numbers else None,
         "max": max(numbers) if numbers else None,
@@ -1447,15 +1491,17 @@ def _fact_description(s: _Session, key: str, rows: list[dict[str, Any]]) -> dict
         ops.append("proportional_weights")
     value_paths = sorted({p for r in rows if r["value_paths"] for p in json.loads(r["value_paths"])})
     forms = sorted({r["constraint_form"] for r in rows if r["constraint_form"]})
-    variants = Counter((r["conditions_json"], r["qualifiers_json"]) for r in rows)
+    variants = Counter(_variant(r) for r in rows)
     ordered_variants = sorted(variants.items(), key=lambda item: (-item[1], str(item[0])))
     variant_list = []
-    for (conditions, qualifiers), count in ordered_variants[:MAX_VARIANTS]:
+    for (conditions, qualifiers, grid), count in ordered_variants[:MAX_VARIANTS]:
         item: dict[str, Any] = {"rows": count}
         if conditions is not None:
             item["conditions"] = json.loads(conditions)
         if qualifiers is not None:
             item["qualifiers"] = json.loads(qualifiers)
+        if grid is not None:
+            item["sampled_field_fractions"] = json.loads(grid)
         variant_list.append(item)
     description: dict[str, Any] = {
         **summary,
@@ -1473,12 +1519,12 @@ def _fact_description(s: _Session, key: str, rows: list[dict[str, Any]]) -> dict
 
 
 def _example(s: _Session, key: str, rows: list[dict[str, Any]],
-             ordered_variants: list[tuple[tuple[str | None, str | None], int]]) -> dict[str, Any]:
+             ordered_variants: list[tuple[tuple[str | None, str | None, str | None], int]]) -> dict[str, Any]:
     """One ready-to-run example constraint (or a discovery filter for discovery-only facts)."""
     if not rows:
         return {"example_constraint": None}
-    conditions_text, qualifiers_text = ordered_variants[0][0]
-    variant_rows = [r for r in rows if (r["conditions_json"], r["qualifiers_json"]) == (conditions_text, qualifiers_text)]
+    conditions_text, qualifiers_text, grid_text = ordered_variants[0][0]
+    variant_rows = [r for r in rows if _variant(r) == ordered_variants[0][0]]
     row = variant_rows[0]
     kind = _row_type(row)
     example: dict[str, Any] = {"fact": key}
@@ -1495,7 +1541,7 @@ def _example(s: _Session, key: str, rows: list[dict[str, Any]],
     paths = json.loads(row["value_paths"]) if row["value_paths"] else []
     note: str | None = None
     if kind == "number":
-        numbers = sorted(r["value_num"] for r in variant_rows)
+        numbers = sorted(r["value_num"] for r in variant_rows if r["value_num"] is not None)
         example.update({"op": "between_inclusive", "value": [numbers[0], numbers[-1]]})
     elif kind == "interval":
         if row["metric"] is not None and paths:
@@ -1528,6 +1574,10 @@ def _example(s: _Session, key: str, rows: list[dict[str, Any]],
         example["conditions"] = json.loads(conditions_text)
     if qualifiers_text is not None and row["metric"] is not None and len(rows) > len({r["config_pk"] for r in rows}):
         example["select"] = json.loads(qualifiers_text)
+    if grid_text is not None:
+        grid = json.loads(grid_text)
+        if isinstance(grid, list) and grid and all(_is_number(v) for v in grid):
+            example["required_sampled_field_fractions"] = grid
     out = {"example_constraint": example}
     if note:
         out["note"] = note
@@ -1550,9 +1600,11 @@ def compare(index: Index, refs: Sequence[str], fields: Sequence[str] | None = No
 
     Result: `{"candidates": [{ref, record_id, revision, configuration_id, title}], "rows": [{fact,
     values: [cell | null per candidate], comparable, differs_by?, notes?}]}`. A row is comparable when
-    every present value is single-valued with the same unit, structured conditions and qualifiers
-    (JSON value equality); otherwise `differs_by` names what differs and the cells carry their
-    conditions. Rows default to the union of the candidates' default summary facts.
+    every present value is single-valued with the same unit, structured conditions, qualifiers and
+    sampling grid (JSON value equality; a missing grid differs from any grid); otherwise
+    `differs_by` names what differs and the cells carry their conditions, and each cell shows its
+    `sampled_field_fractions` (null without one) when the grids differ. Rows default to the union of
+    the candidates' default summary facts.
     """
     s = _Session(index)
     budget = output.check_max_output_bytes(max_output_bytes, "max_output_bytes")
@@ -1607,6 +1659,12 @@ def compare(index: Index, refs: Sequence[str], fields: Sequence[str] | None = No
             differs.append("conditions")
         if len({r["qualifiers_json"] for r in singles}) > 1:
             differs.append("qualifiers")
+        if len({r["sampled_field_fractions_json"] for r in singles}) > 1:
+            differs.append("sampled_field_fractions")
+            for cell, rows in zip(cells, per):
+                if cell is not None and rows and len(rows) == 1:
+                    grid = rows[0]["sampled_field_fractions_json"]
+                    cell["sampled_field_fractions"] = None if grid is None else json.loads(grid)
         if "conditions" in differs or "qualifiers" in differs:
             for cell, rows in zip(cells, per):
                 if cell is not None and rows and len(rows) == 1:
@@ -1658,6 +1716,9 @@ def _related_checks(view: dict[str, Any], key: str, check_members: Sequence[str]
     out: dict[str, Any] = {}
     for name in check_members:
         check = section.get(name)
+        if name in _SECTION_WIDE_CHECKS and check is not None:
+            out[name] = check
+            continue
         if not isinstance(check, dict):
             continue
         if check.get("quantity") in (member, stem):
@@ -1688,6 +1749,8 @@ def _fact_full(s: _Session, view: dict[str, Any], row: dict[str, Any]) -> dict[s
         entry["conditions"] = json.loads(row["conditions_json"])
     if row["qualifiers_json"] is not None:
         entry["qualifiers"] = json.loads(row["qualifiers_json"])
+    if row["sampled_field_fractions_json"] is not None:
+        entry["sampled_field_fractions"] = json.loads(row["sampled_field_fractions_json"])
     obj = entry["value"]
     if isinstance(obj, dict) and isinstance(obj.get("source"), dict):
         resolved = s.index.resolve_source(obj["source"])
@@ -1696,25 +1759,179 @@ def _fact_full(s: _Session, view: dict[str, Any], row: dict[str, Any]) -> dict[s
     return entry
 
 
-def _evidence_documents(s: _Session, record_pk: int, record: dict[str, Any]) -> dict[str, tuple[str, Any]]:
-    """Verified evidence files of a record: path -> (sha256, parsed JSON)."""
-    candidates: dict[str, str] = {}
+def _evidence_path(path: Any) -> str | None:
+    """The normalized form of an evidence path (the raw string when it is not corpus-relative)."""
+    if not isinstance(path, str):
+        return None
+    return corpus_relative_path(path) or path
+
+
+@dataclass
+class _EvidenceScope:
+    """The evidence of one record as seen by the selected configuration(s) (all of them when no
+    configuration is named).
+
+    A configuration *references* a (path, section) pair when a source reference in its view names
+    it. A pair referenced only by non-selected configurations does not apply. Applicable pairs are
+    the other sections of the verified files that a selected view references, and of the
+    record-level `collection.evidence_extract` unless only non-selected configurations reference
+    that file.
+    """
+
+    selected: set[int]
+    """Ordinals of the selected configurations."""
+    configuration_ids: dict[int, str | None]
+    pair_refs: dict[tuple[str | None, str | None], set[int]]
+    file_refs: dict[str | None, set[int]]
+    documents: dict[str, tuple[str, Any]] = field(default_factory=dict)
+    """Candidate files: path -> (sha256, parsed JSON of the verified bytes)."""
+    damaged: dict[str, str] = field(default_factory=dict)
+    """Candidate files the index no longer holds intact: path -> live status. Their bytes are
+    never parsed or shown."""
+
+    def excluded_pair(self, path: str | None, section: str | None) -> bool:
+        refs = self.pair_refs.get((path, section))
+        return bool(refs) and not refs & self.selected
+
+    def excluded_file(self, path: str | None) -> bool:
+        refs = self.file_refs.get(path)
+        return bool(refs) and not refs & self.selected
+
+    def lists(self, ref: dict[str, Any]) -> bool:
+        """Whether an evidence_refs row belongs in the scoped listing."""
+        entry = _ENTRY_REF_FIELD.match(ref["field"])
+        if entry is not None and int(entry.group(1)) not in self.selected:
+            return False
+        path = _evidence_path(ref["path"])
+        if ref["field"] == "collection.evidence_extract":
+            return not self.excluded_file(path)
+        return not self.excluded_pair(path, ref["section"])
+
+    def sections(self, path: str) -> list[str]:
+        """The applicable section names of a candidate file, sorted."""
+        document = self.documents[path][1]
+        content = document.get("sections") if isinstance(document, dict) else None
+        if not isinstance(content, dict):
+            return []
+        return sorted(name for name in content if not self.excluded_pair(path, name))
+
+    def by_section(self) -> dict[str, list[str]]:
+        """Every applicable pair, as section name -> paths."""
+        out: dict[str, list[str]] = {}
+        for path in sorted(self.documents):
+            for name in self.sections(path):
+                out.setdefault(name, []).append(path)
+        return out
+
+    def referencing(self, path: str, section: str | None = None) -> list[str | None]:
+        """Ids of the configurations referencing a file (or one of its sections), in ordinal order."""
+        refs = self.file_refs.get(path) if section is None else self.pair_refs.get((path, section))
+        return [self.configuration_ids[ordinal] for ordinal in sorted(refs or ())]
+
+
+def _evidence_scope(s: _Session, record_pk: int, record: dict[str, Any], configuration: str | None,
+                    config: dict[str, Any]) -> _EvidenceScope:
+    configs = s.index.configurations(record_pk, with_view=True)
+    selected = {config["ordinal"]} if configuration is not None else {c["ordinal"] for c in configs}
+    scope = _EvidenceScope(selected, {c["ordinal"]: c["configuration_id"] for c in configs}, {}, {})
+    candidates: dict[str, set[str]] = {}
+    for item in configs:
+        for _, ref in iter_source_refs(item["view"]):
+            path = _evidence_path(ref.get("path"))
+            section = ref.get("section") if isinstance(ref.get("section"), str) else None
+            scope.pair_refs.setdefault((path, section), set()).add(item["ordinal"])
+            scope.file_refs.setdefault(path, set()).add(item["ordinal"])
+            if item["ordinal"] in selected and path is not None and isinstance(ref.get("sha256"), str):
+                candidates.setdefault(path, set()).add(ref["sha256"])
     extract = (record.get("collection") or {}).get("evidence_extract")
-    if isinstance(extract, dict) and isinstance(extract.get("path"), str) and isinstance(extract.get("sha256"), str):
-        candidates[extract["path"]] = extract["sha256"]
-    for ref in s.index.evidence_refs(record_pk):
-        if ref["path"] and ref["sha256"] and ref["status"] == "RESOLVED":
-            candidates.setdefault(ref["path"], ref["sha256"])
-    out: dict[str, tuple[str, Any]] = {}
+    if isinstance(extract, dict) and isinstance(extract.get("sha256"), str):
+        path = _evidence_path(extract.get("path"))
+        if path is not None and not scope.excluded_file(path):
+            candidates.setdefault(path, set()).add(extract["sha256"])
+    # (path, sha256) pairs that reached a stored file at build: failing now means damage. A pair
+    # the build rejected (--allow-unresolved-evidence) is merely unresolved.
+    stored_at_build = {(_evidence_path(ref["path"]), ref["sha256"]) for ref in s.index.evidence_refs(record_pk)
+                       if ref["build_status"] in ("RESOLVED", "SECTION_MISSING") and ref["sha256"] is not None}
     for path in sorted(candidates):
-        content = s.index.evidence_file(path, candidates[path])
-        if content is None:
-            continue
-        try:
-            out[path] = (candidates[path], json.loads(content.decode("utf-8")))
-        except (UnicodeDecodeError, ValueError):
-            continue
+        for sha in sorted(candidates[path]):
+            status, content = s.index.evidence_state(path, sha)
+            if content is None:
+                if s.index.evidence_damaged(path):
+                    scope.damaged[path] = "HASH_MISMATCH"
+                elif (path, sha) in stored_at_build:
+                    scope.damaged[path] = status
+                continue
+            try:
+                scope.documents[path] = (sha, json.loads(content.decode("utf-8")))
+            except (UnicodeDecodeError, ValueError, RecursionError):
+                continue
+    return scope
+
+
+def _damaged_evidence(index: Index, record_id: str, damaged: dict[str, str]) -> LensError:
+    """INDEX_UNAVAILABLE for evidence the index no longer holds intact (nothing of it is echoed)."""
+    path, status = sorted(damaged.items())[0]
+    problem = f"damaged: stored evidence {path} does not verify against its sha256 ({status})"
+    return LensError(
+        "INDEX_UNAVAILABLE", f"the index {index.path} is damaged: stored evidence of record {record_id!r} "
+        "does not verify against its sha256",
+        hint="Rebuild the index with `os-optics-lens index build --corpus <dir> --out <file>`.",
+        details={"tried": [{"source": index.source, "path": str(index.path), "problem": problem}],
+                 "path": str(index.path), "record_id": record_id,
+                 "evidence": [{"path": name, "status": state} for name, state in sorted(damaged.items())]})
+
+
+def _select_evidence(scope: _EvidenceScope, names: list[str], record_id: str) -> dict[str, Any]:
+    """The requested evidence sections keyed by file path. A name is a section name (which must
+    identify one applicable file), `path#section`, or `all` (every applicable pair)."""
+    available = scope.by_section()
+    if "all" in names:
+        wanted = [(path, name) for name, paths in available.items() for path in paths]
+    else:
+        wanted = []
+        for i, name in enumerate(names):
+            paths = available.get(name)
+            if paths is None and "#" in name:
+                raw_path, _, section = name.rpartition("#")
+                path = _evidence_path(raw_path)
+                if path in available.get(section, ()):
+                    wanted.append((path, section))
+                    continue
+            if paths is None:
+                raise LensError(
+                    "EVIDENCE_SECTION_NOT_FOUND",
+                    f"record {record_id!r} has no evidence section {_short_text(name)!r} in the selected "
+                    "configuration scope",
+                    hint="sections: " + (", ".join(sorted(available)) or "none"),
+                    details={"pointer": _ptr("/evidence", i), "section": _short_text(name),
+                             "available": sorted(available)})
+            if len(paths) > 1:
+                raise LensError(
+                    "EVIDENCE_AMBIGUOUS",
+                    f"evidence section {name!r} names {len(paths)} different files of record {record_id!r}",
+                    hint=f"Select one as path#section (e.g. --evidence {paths[0]}#{name}), or narrow with "
+                         "--configuration.",
+                    details={"pointer": _ptr("/evidence", i), "section": name,
+                             "candidates": [{"path": path, "configurations": scope.referencing(path, name)}
+                                            for path in paths]})
+            wanted.append((paths[0], name))
+    out: dict[str, Any] = {}
+    for path, name in sorted(set(wanted)):
+        sha, document = scope.documents[path]
+        entry = out.setdefault(path, {"sha256": sha, "sections": {}})
+        entry["sections"][name] = document["sections"][name]
     return out
+
+
+def _objects(value: Any) -> list[dict[str, Any]]:
+    """The objects of a list; anything else (the Project's models are not type-checked at build)
+    contributes nothing."""
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _position(item: dict[str, Any]) -> Any:
+    pose = item.get("pose")
+    return pose.get("position_mm") if isinstance(pose, dict) else None
 
 
 def _prescription(project: Any, level: str, native_ids: list[Any]) -> dict[str, Any]:
@@ -1723,34 +1940,31 @@ def _prescription(project: Any, level: str, native_ids: list[Any]) -> dict[str, 
     if level == "full":
         return {name: project.get(name) for name in ("optical_models", "model_materials", "model_coatings")}
     models = []
-    for model in project.get("optical_models") or []:
-        if not isinstance(model, dict):
-            continue
+    for model in _objects(project.get("optical_models")):
         body = model.get("model") if isinstance(model.get("model"), dict) else {}
         item: dict[str, Any] = {"model_id": model.get("model_id"), "kind": body.get("model_kind")}
         members = body.get("members")
         if isinstance(members, list):
             item["members"] = [
-                {"member_id": m.get("member_id"), "model_id": m.get("model_id"),
-                 "position_mm": (m.get("pose") or {}).get("position_mm")}
-                for m in members if isinstance(m, dict)]
+                {"member_id": m.get("member_id"), "model_id": m.get("model_id"), "position_mm": _position(m)}
+                for m in _objects(members)]
         surfaces = body.get("surfaces")
         if isinstance(surfaces, list):
             item["surfaces"] = len(surfaces)
-            materials = sorted({str(v) for surf in surfaces if isinstance(surf, dict)
+            materials = sorted({str(v) for surf in _objects(surfaces)
                                 for k, v in surf.items() if k.endswith("material_id") and v})
             if materials:
                 item["materials"] = materials
         models.append(item)
-    roles = Counter(c.get("optical_role") for c in project.get("components") or [] if isinstance(c, dict))
+    roles = Counter(role if role is None or isinstance(role, str) else json.dumps(role, sort_keys=True)
+                    for role in (c.get("optical_role") for c in _objects(project.get("components"))))
     observations = [
-        {"observation_id": o.get("observation_id"), "aperture": o.get("aperture"),
-         "position_mm": (o.get("pose") or {}).get("position_mm")}
-        for o in project.get("observations") or [] if isinstance(o, dict)]
+        {"observation_id": o.get("observation_id"), "aperture": o.get("aperture"), "position_mm": _position(o)}
+        for o in _objects(project.get("observations"))]
     return {
         "optical_models": models,
-        "materials": [m.get("material_id") for m in project.get("model_materials") or [] if isinstance(m, dict)],
-        "coatings": [c.get("coating_id") for c in project.get("model_coatings") or [] if isinstance(c, dict)],
+        "materials": [m.get("material_id") for m in _objects(project.get("model_materials"))],
+        "coatings": [c.get("coating_id") for c in _objects(project.get("model_coatings"))],
         "observation_planes": observations,
         "components": dict(sorted((str(k), v) for k, v in roles.items())),
         "native_configuration_ids": native_ids,
@@ -1793,9 +2007,11 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
 
     Default result: identity, provenance, license, native Project metadata, configurations,
     validation summary, facets, the fact keys of the selected configuration and the evidence
-    sections available. `fields` adds those facts in full (a section name or key prefix selects
-    every fact under it); `sections` adds whole view sections; `evidence` (section names or "all")
-    adds sections of the record's verified evidence extracts; `prescription` ("summary" | "full")
+    references and sections available. The evidence is scoped to `configuration`, or covers every
+    configuration when none is named (see `_EvidenceScope`). `fields` adds those facts in full (a
+    section name or key prefix selects every fact under it); `sections` adds whole view sections;
+    `evidence` (section names, `path#section` or "all") adds sections of the record's verified
+    evidence extracts, keyed by path; `prescription` ("summary" | "full")
     adds the native Project's optical model overview or its models, materials and coatings. A
     response over the byte budget raises OUTPUT_LIMIT_EXCEEDED: narrow the request.
     """
@@ -1814,12 +2030,13 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
         values = sorted(s.facets_of(config, name))
         if values:
             record_facets[name] = values
-    evidence_refs = s.index.evidence_refs(row["record_pk"])
+    evidence_scope = _evidence_scope(s, row["record_pk"], record, configuration, config)
     grouped_refs: dict[tuple[Any, Any, Any], int] = {}
-    for ref in evidence_refs:
+    for ref in s.index.evidence_refs(row["record_pk"]):
+        if not evidence_scope.lists(ref):
+            continue
         grouped_refs[(ref["path"], ref["section"], ref["status"])] = grouped_refs.get(
             (ref["path"], ref["section"], ref["status"]), 0) + 1
-    documents = _evidence_documents(s, row["record_pk"], record)
     result: dict[str, Any] = {
         "record_id": row["record_id"], "revision": row["revision"], "title": row["title"],
         "record_schema_version": row["record_schema_version"], "record_hash": row["record_hash"],
@@ -1841,12 +2058,14 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
         "evidence": {
             "refs": [{"path": p, "section": sec, "status": st, "count": n}
                      for (p, sec, st), n in sorted(grouped_refs.items(), key=lambda item: tuple(str(x) for x in item[0]))],
-            "sections": {path: sorted((doc.get("sections") or {}).keys()) if isinstance(doc, dict) else []
-                         for path, (_, doc) in documents.items()},
+            "sections": {path: evidence_scope.sections(path) for path in sorted(evidence_scope.documents)},
+            "files": {path: {"configurations": evidence_scope.referencing(path),
+                             **({"status": evidence_scope.damaged[path]} if path in evidence_scope.damaged else {})}
+                      for path in sorted(set(evidence_scope.documents) | set(evidence_scope.damaged))},
         },
         "next": {
             "fields": f"os-optics-lens inspect {row['record_id']} --fields <fact_key,...>",
-            "evidence": f"os-optics-lens inspect {row['record_id']} --evidence <section|all>",
+            "evidence": f"os-optics-lens inspect {row['record_id']} --evidence <section|path#section|all>",
             "prescription": f"os-optics-lens inspect {row['record_id']} --prescription summary",
             "project": f"os-optics-lens project {row['record_id']} --out <file>",
         },
@@ -1855,6 +2074,7 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
         keys = _string_list(list(fields), "/fields", "fields")
         selected: dict[str, Any] = {}
         for i, key in enumerate(keys):
+            s.reject_check(key, _ptr("/fields", i))
             matched = [k for k in sorted(facts) if k == key or k.startswith(key + ".")]
             if not matched:
                 if s.is_known_fact(key) or any(k.startswith(key + ".") for k in s.fact_keys()):
@@ -1883,21 +2103,10 @@ def inspect(index: Index, record_id: str, *, revision: int | None = None, config
         result["sections"] = chosen
     if evidence is not None:
         names = _string_list(list(evidence), "/evidence", "evidence")
-        available = {name: path for path, (_, doc) in documents.items() if isinstance(doc, dict)
-                     for name in (doc.get("sections") or {})}
-        wanted = sorted(available) if "all" in names else names
-        out: dict[str, Any] = {}
-        for i, name in enumerate(wanted):
-            if name not in available:
-                raise LensError("EVIDENCE_SECTION_NOT_FOUND", f"record {row['record_id']!r} has no evidence section {name!r}",
-                                hint="sections: " + (", ".join(sorted(available)) or "none"),
-                                details={"pointer": _ptr("/evidence", i), "section": name,
-                                         "available": sorted(available)})
-            path = available[name]
-            sha, doc = documents[path]
-            entry = out.setdefault(path, {"sha256": sha, "sections": {}})
-            entry["sections"][name] = doc["sections"][name]
-        result["evidence_sections"] = out
+        if evidence_scope.damaged:
+            # A damaged file's sections are unknown, so no selection over this record is safe.
+            raise _damaged_evidence(s.index, row["record_id"], evidence_scope.damaged)
+        result["evidence_sections"] = _select_evidence(evidence_scope, names, row["record_id"])
     if prescription is not None:
         if prescription not in PRESCRIPTION_LEVELS:
             raise _invalid("prescription must be summary or full", "/prescription", allowed=list(PRESCRIPTION_LEVELS))

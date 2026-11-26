@@ -9,6 +9,8 @@ Each hard constraint is evaluated against one configuration view of a record:
 * `DOES_NOT_MATCH` - a comparable value exists and violates a predicate. Numeric violations carry
   a `shortfall` (absolute distance to the violated limit, in the fact's unit) and `relative`
   (shortfall / |limit|). A strict `gt`/`lt` at equality has shortfall 0.0 and `strict: true`.
+  Either number is `null` when it is not representable as a finite number (for example a gap
+  divided by a limit of 1e-308); the outcome is unaffected.
 * `UNCONFIRMED` - the record cannot confirm or refute the constraint; `reason` says why. A
   missing value is never a match and never a failure.
 
@@ -29,12 +31,13 @@ verify.
 | reason | meaning | what to do |
 |---|---|---|
 | `FACT_MISSING` | the configuration has no such fact (`details.available_alternatives` lists related facts; they are never substituted) | choose a fact the record has (`fields`), or treat as open |
-| `CONDITIONS_DIFFER` | no entry has the requested conditions (`details` shows expected vs actual) | relax or change `conditions`, or inspect the record |
+| `CONDITIONS_DIFFER` | no entry has the requested conditions (`details` shows `expected` vs `actual`, or `present: false` for a member the fact does not state) | relax or change `conditions`, or inspect the record |
 | `AMBIGUOUS_FACTS` | more than one entry matches the conditions | pin more conditions or use `select` |
 | `DISCOVERY_ONLY` | the fact is a discovery label (e.g. `spectrum.sampling_span_nm`) | constrain a confirmed fact instead |
-| `COMPARISON_ONLY` | the path reaches (or the compared object contains) a check kept for comparison only: `property_list_comparison`, `engine_check`; never a value | constrain the fact itself |
+| `COMPARISON_ONLY` | the path reaches (or the compared object contains) a provenance check: `property_list_comparison`, `engine_check`, `prescription_dump_check`, `catalog_comparisons`; never a value | constrain the fact itself |
 | `COVERAGE_UNCONFIRMED` | continuous spectral coverage is not established | treat coverage as open |
-| `SAMPLING_DIFFERS` | the sampled field fractions differ from `required_sampled_field_fractions` | inspect the samples |
+| `SAMPLING_DIFFERS` | the sampled field fractions differ from `required_sampled_field_fractions` (or the fact states none) | inspect the samples |
+| `SAMPLING_UNSPECIFIED` | a target or preference value has a sampling grid that the request does not pin | add `required_sampled_field_fractions` to the target or preference (see `fields --fact`) |
 | `STOP_NOT_ELIGIBLE` | stop-dependent fact, but the Project's stop does not block light | evaluate the Project with a real stop |
 | `STOP_MATCH_NOT_SUPPORTED` | stop-dependent value passes, but the record may not claim a stop-dependent match | verify with os-optics |
 | `EVIDENCE_MISSING` | evidence is required but the fact has no source | treat as unverified |
@@ -69,8 +72,19 @@ Targets and preferences use step 1 only. The `stop_state` facet shows the state 
 * Sampled wavelengths: `spectrum.sampling_wavelengths_nm` with `includes_all` or `eq`; spectral
   weights with `proportional_weights` (same ordered wavelengths, weights compared by ratio).
   `covers_interval` on a list of samples is UNCONFIRMED `VALUE_TYPE`: it needs an interval object.
-* `aperture.property_list_comparison` and `field.property_list_comparison` are comparison-only
-  checks, never values: UNCONFIRMED `COMPARISON_ONLY`.
+## Provenance checks
+
+`engine_check`, `property_list_comparison`, `field.prescription_dump_check` and
+`materials.catalog_comparisons` compare source data. They are provenance, never values:
+
+* they are not typed facts; `inspect --fields` shows them under `checks` of the facts they
+  concern (`prescription_dump_check` under every `field.*` fact) and `inspect --sections` shows
+  the section that holds them;
+* a constraint that reaches one (by its path, through a parent object such as the whole `field`
+  section with path `""`, by a nested predicate path, or by `select`/`conditions` naming it) is
+  UNCONFIRMED `COMPARISON_ONLY`;
+* a target, preference (either form), range, `fields` entry, `fields --fact` or `--fields`
+  naming one is `UNKNOWN_FIELD` with `details.provenance_check`: it cannot be matched or ranked.
 
 ## Aperture conventions
 
@@ -93,11 +107,29 @@ geometric_axial_distance`, `from: last_powered_surface_vertex`, `to: fixed_image
 
 Performance entries (`performance.<metric>`) carry structured `conditions` (frequency, field
 mapping, spectrum, image plane, ...). A constraint compares only entries whose conditions equal
-every key it pins (JSON value equality: `0 == 0.0`, `true != 1`, lists ordered). Keys it does
-not pin are listed as `unpinned` on a MATCH, so a compact bare `"MATCH"` means the constraint
-pinned every condition of the matched fact and the fact has no prose conditions. Prose
-conditions appear as `unpinned._text`; they are information, not comparison keys. An interval
-MTF is a sampled minimum: `required_sampled_field_fractions` pins the samples and
+every key it pins (JSON value equality: `0 == 0.0`, `true != 1`, lists ordered). A pinned key
+must be present in the fact: an absent key never equals a requested `null` (a stored `null`
+does). A `spectrum` object is compared member by member: every requested member must be present;
+`incident_weights` compare by ratio and must be requested together with their ordered
+`sampling_wavelengths_nm` (else `INVALID_REQUEST`). The same presence rule applies to `select`,
+target and preference conditions and the cost pins of the fixture preference. Keys a constraint
+does not pin are listed as `unpinned` on a MATCH (members of a partly pinned spectrum as
+`spectrum.<member>`, an unpinned sampling grid as `sampled_field_fractions`), so a compact bare
+`"MATCH"` means the constraint pinned every condition of the matched fact and the fact has no
+prose conditions. Prose conditions appear as `unpinned._text`; they are information, not
+comparison keys.
+
+## Sampling grids
+
+`sampled_field_fractions` is a comparison condition of a sampled value: an interval MTF is a
+minimum over the sampled positions, so minima over different grids are not the same quantity.
+`required_sampled_field_fractions` (a non-empty list of numbers, compared in order) pins the
+grid of a constraint, target or shorthand preference; a different or missing grid is
+`SAMPLING_DIFFERS`. A target or preference on a value with a grid it does not pin is unknown
+`SAMPLING_UNSPECIFIED`, so different grids are never silently ranked together (the fixture cost
+form cannot pin one). The quick flags `--target` and `--prefer` cannot pin a grid: use
+`--request`. `fields` lists each grid as its own condition variant, and `compare` marks rows
+with different grids `comparable: false` (`differs_by: sampled_field_fractions`).
 `requires_evidence_source` requires a resolvable source.
 
 ## Evidence
@@ -105,7 +137,22 @@ MTF is a sampled minimum: `required_sampled_field_fractions` pins the samples an
 A fact's `source {path, sha256, section}` resolves when the index holds that file with that
 sha256 (over LF bytes) and the section exists. Resolution uses only the index, never the file
 system. An index built with `--allow-unresolved-evidence` keeps unresolvable references as
-unresolved, which leaves the constraints that need them UNCONFIRMED.
+unresolved, which leaves the constraints that need them UNCONFIRMED. Evidence files are JSON
+objects with `schema: "opensci.lens.evidence_extract"` and a `sections` object; only members of
+`sections` can be referenced or inspected (other top-level members are metadata).
+
+Every use re-hashes the stored bytes, which must match both the stored digest and the
+reference's: otherwise the status is `HASH_MISMATCH`, constraints that need the evidence are
+UNCONFIRMED (`EVIDENCE_UNRESOLVED`), `inspect` marks the file in `evidence.files`, and
+`inspect --evidence` of that record is `INDEX_UNAVAILABLE` (rebuild the index).
+
+`inspect` scopes evidence to configurations. The scope is the `--configuration` named, else every
+configuration of the record. A (file, section) pair referenced only by configurations outside the
+scope does not apply; the other sections of the files the scope references, and of the record's
+`collection.evidence_extract` unless only outside configurations reference that file, do.
+`--evidence NAME` needs exactly one applicable file with that section; several are
+`EVIDENCE_AMBIGUOUS` (choose `path#section` or `--configuration`). `--evidence all` returns every
+applicable section, keyed by file path.
 
 ## Bases
 

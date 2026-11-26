@@ -7,7 +7,7 @@ Every command prints exactly one JSON document followed by a newline. The JSON i
 
 ```
 {"ok": true,
- "snapshot": {"id": "db03814630c2a339", "records": 41, "configurations": 41},
+ "snapshot": {"id": "0262201eaf2c8e3c", "records": 41, "configurations": 41},
  "result": {...}                  single query and every other command
  "results": [...],                batch only, instead of result
  "warnings": [...],               optional: {code, pointer, message?, did_you_mean?}
@@ -67,7 +67,8 @@ A candidate (one record, at its best configuration):
   `shortfalls`, `unpinned`, `fact` (json_path, value, unit, basis, conditions, source with its
   resolution status) and per-predicate results.
 * `shortfalls`: hard DOES_NOT_MATCH gaps `{constraint, path, value, limit, shortfall, relative,
-  strict?, unit?}` (non-numeric failures list the failing predicates), then target deviations
+  strict?, unit?}` (`shortfall` and `relative` are `null` when not representable as finite numbers;
+  non-numeric failures list the failing predicates), then target deviations
   `{target, fact, value, target_value, deviation, normalized, scale_basis, weight, unit}`; the
   target score is the sum of `weight * normalized`.
 * `unknowns`: `{constraint | target | preference, reason}` for everything UNCONFIRMED or not
@@ -101,11 +102,18 @@ A batch returns `"results": [{"index": 0, "ok": true, "result": {...}}, {"index"
   `value_paths`, `applicable_ops`, `eligible_for`, `constraint_form`, `variants`,
   `example_constraint`.
 * `compare`: `{candidates: [{ref, record_id, revision, configuration_id, title}], rows: [{fact,
-  values: [cell | null], comparable, differs_by?, missing?, notes?}]}`. Refs must name distinct
-  configurations; `ID@` (empty configuration id) is `INVALID_REQUEST`.
+  values: [cell | null], comparable, differs_by?, missing?, notes?}]}`. `differs_by` lists
+  `multi_valued`, `unit`, `conditions`, `qualifiers` or `sampled_field_fractions`; when grids
+  differ, each single-valued cell shows its `sampled_field_fractions` (`null` without one). Refs
+  must name distinct configurations; `ID@` (empty configuration id) is `INVALID_REQUEST`.
 * `inspect`: identity, `collection`, `license`, `design`, `native_project`, `configuration(s)`,
-  `validation`, `facets`, `fact_keys`, evidence sections, `next`; plus requested `fields`,
-  `sections`, `evidence`, `prescription`.
+  `validation`, `facets`, `fact_keys`, `evidence {refs, sections, files}` (statuses are checked
+  against the stored bytes now; a damaged file is marked `status` in `files` and lists no
+  sections), `next`; plus requested
+  `fields` (with `checks` for provenance checks), `sections`, `evidence_sections: {path: {sha256,
+  sections: {name: content}}}`, `prescription`. `evidence` is scoped to `--configuration` (else
+  all configurations): `refs` `{path, section, status, count}`, `sections` `{path: [names]}`,
+  `files` `{path: {configurations: [ids referencing the file]}}` (`help semantics`).
 * `project`: `{record_id, revision, sha256, size_bytes, native_configuration_ids, engine_version,
   license, attribution, next}`; with `--out` also `path` (absolute) and `written_sha256`.
   `--stdout` prints the raw Project bytes instead of JSON (`--max-output-bytes` is rejected

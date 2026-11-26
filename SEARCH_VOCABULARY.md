@@ -24,6 +24,7 @@ These terms describe possible search tasks. Use them when records provide a mean
 | Laser and coupling | Beam scanning as a function, F-theta scan lens and fiber coupler as design types, and laser processing as an application. Afocal and anamorphic as optical properties. |
 | Spectroscopy | Czerny–Turner and Dyson as spectrometer architectures. Echelle, grating-based and prism-based as structural descriptions. |
 | Imaging and viewing | Macro lens, fisheye lens and head-up display optics as design types. Remote sensing, thermal imaging, near-eye display and microlithography as applications. Cooke triplet, Tessar and Double Gauss as architecture terms when supported by the source. Use a separate family ID for variants of a particular prescription. |
+| Mobile modules | `main_camera`, `ultrawide`, `telephoto` and `front_camera` as a module-role facet on phone prescriptions. The role says where the module sits in a device, not what the prescription is: the same camera-lens structure can serve any of them, so keep it separate from design type and application. Assign it only when the source or the contributor establishes the role. |
 
 ## Search facts by task
 

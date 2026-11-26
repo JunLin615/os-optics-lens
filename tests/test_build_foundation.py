@@ -889,7 +889,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.result.warnings, 0)
         meta = self.index.meta()
         self.assertEqual(meta["snapshot_id"], self.result.snapshot_id)
-        self.assertEqual(meta["index_schema_version"], "1")
+        self.assertEqual(meta["index_schema_version"], "2")
         self.assertEqual(meta["builder"], "os-optics-lens 0.1.0")
         self.assertEqual(int(meta["fact_count"]), self.result.facts)
         self.assertEqual((self.index.record_count, self.index.configuration_count), (on_disk, on_disk))

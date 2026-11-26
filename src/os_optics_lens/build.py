@@ -9,6 +9,10 @@ Reproducibility: rows are inserted in sorted order, all stored JSON is canonical
 time-, path- or environment-dependent is stored, so two builds of the same inputs with the same
 Python/SQLite are byte-identical and `dump_index` is identical across environments.
 
+meta also records what a reader must agree with: `vocabulary_digest` and `index_semantics` (the
+fingerprint of the index-producing sources, see `semantics`); `store.Index` refuses an index whose
+values differ from its own.
+
 snapshot_id (10.19) = first 16 hex of SHA-256 over the canonical JSON of {index_schema_version,
 builder_version, vocabulary_digest, allow_unresolved_evidence, content_digest}, where content_digest is
 the SHA-256 of the canonical dump of every table except meta.
@@ -28,9 +32,10 @@ from . import __version__
 from .canonical import canonical_json, sha256_hex, sha256_text
 from .corpus import Corpus, load_corpus
 from .errors import LensError
+from .semantics import index_fingerprint
 from .vocabulary import Vocabulary, load_vocabulary
 
-INDEX_SCHEMA_VERSION = "1"
+INDEX_SCHEMA_VERSION = "2"
 BUILDER = f"os-optics-lens {__version__}"
 
 SCHEMA_SQL = """
@@ -94,6 +99,7 @@ CREATE TABLE facts(
   qualifiers_json TEXT,
   value_paths TEXT,
   constraint_form TEXT,
+  sampled_field_fractions_json TEXT,
   source_ref_pk INTEGER
 );
 CREATE INDEX facts_key_value ON facts(fact_key, value_num);
@@ -123,11 +129,11 @@ CREATE TABLE findings(severity TEXT NOT NULL, code TEXT NOT NULL, record_id TEXT
 FACT_COLUMNS = (
     "fact_key", "json_path", "metric", "value_num", "value_min", "value_max", "value_json", "unit", "basis",
     "basis_class", "conditions_json", "conditions_text", "definition", "eligible_for", "state",
-    "system_aperture", "qualifiers_json", "value_paths", "constraint_form",
+    "system_aperture", "qualifiers_json", "value_paths", "constraint_form", "sampled_field_fractions_json",
 )
 TABLES = ("meta", "records", "configurations", "facets", "facts", "evidence_files", "evidence_refs",
           "projects", "licenses", "findings")
-"""Every table of index schema version 1."""
+"""Every table of the index schema."""
 
 
 @dataclass
@@ -252,7 +258,9 @@ def _source_ref(fact: dict[str, Any], entry: Any, ordinal: int, by_field: dict[s
             location = f"configurations[{ordinal}].{location}"
         if location in by_field:
             return by_field[location]
-    return by_triple.get((source.get("path"), source.get("sha256"), source.get("section")))
+    # A reference row keeps only string members (a mistyped one is None), so only strings can key.
+    triple = tuple(source.get(key) for key in ("path", "sha256", "section"))
+    return by_triple.get(tuple(value if isinstance(value, str) else None for value in triple))
 
 
 def _dump_tables(conn: sqlite3.Connection, tables: tuple[str, ...]) -> dict[str, Any]:
@@ -303,6 +311,7 @@ def _write_index(path: Path, corpus: Corpus, allow_unresolved_evidence: bool, vo
             "content_digest": content_digest,
             "allow_unresolved_evidence": allow_flag,
             "vocabulary_digest": vocabulary.digest,
+            "index_semantics": index_fingerprint(),
         }
         for key in sorted(meta):
             conn.execute("INSERT INTO meta VALUES (?,?)", (key, meta[key]))

@@ -4,11 +4,14 @@
 the `path` argument (`--index`), the `OS_OPTICS_LENS_INDEX` environment variable, then the bundled
 `os_optics_lens/_data/index.sqlite`. There is no implicit lookup in the working directory. The file is
 opened as `file:<abs>?mode=ro&immutable=1`, so read-only installs and read-only trees work and no
-sidecar files are created. A missing, corrupt or schema-mismatched index raises `INDEX_UNAVAILABLE`
-with `details.tried` and a hint naming `os-optics-lens index build`.
+sidecar files are created. A missing, corrupt or schema-mismatched index, or one built with other
+vocabulary or indexing code than this reader's (meta `vocabulary_digest` and `index_semantics`),
+raises `INDEX_UNAVAILABLE` with `details.tried` and a hint naming `os-optics-lens index build`.
 
-Evidence resolution is a pure function of the source object and the verified `evidence_files`
-(`resolve_source_in`); it never reads the filesystem.
+Evidence resolution is a pure function of the source object and the stored `evidence_files`
+(`resolve_source_in`); it never reads the filesystem. Evidence bytes are verified before every
+use: they must hash to the stored digest column AND to the digest the reference expects
+(SQLite has no page checksums), else the status is HASH_MISMATCH. Caches hold verified content only.
 """
 
 from __future__ import annotations
@@ -25,27 +28,37 @@ from typing import Any, Union
 
 from .canonical import HEX64, JsonFormatError, corpus_relative_path, loads_strict, sha256_hex
 from .errors import LensError
+from .semantics import index_fingerprint
+from .vocabulary import load_vocabulary
 
 ENV_VAR = "OS_OPTICS_LENS_INDEX"
-INDEX_SCHEMA_VERSION = "1"
+INDEX_SCHEMA_VERSION = "2"
 REQUIRED_TABLES = frozenset({"meta", "records", "configurations", "facets", "facts", "evidence_files",
                              "evidence_refs", "projects", "licenses", "findings"})
 BUILD_HINT = ("Build an index with `os-optics-lens index build --corpus <dir> --out <file>`, then pass "
               f"`--index <file>` or set {ENV_VAR}=<file>.")
+NOTICE_FIELD = "collection.license.notice_path"
 
 FilesLookup = Union[Mapping[str, tuple[str, bytes]], Callable[[str], Union[tuple[str, bytes], None]]]
-"""Evidence files by normalized corpus-relative path: path -> (sha256, LF bytes), or a callable."""
+"""Evidence files by normalized corpus-relative path: path -> (stored sha256, LF bytes), or a
+callable. The bytes are verified on every use."""
+
+
+def _hashes_to(content: Any, digest: Any) -> bool:
+    """True when `content` is bytes whose SHA-256 equals `digest`."""
+    return isinstance(content, bytes) and sha256_hex(content) == digest
 
 
 def resolve_source_in(files: FilesLookup, source: Any,
                       cache: dict[tuple[str, str], Any] | None = None) -> dict[str, Any]:
-    """Resolve a fact's `source` object against verified evidence files (amendment 10.4).
+    """Resolve a fact's `source` object against stored evidence files (amendment 10.4).
 
     Returns `{"status": ...}` with status one of RESOLVED, MISSING (no source object), MALFORMED
-    (path/section not non-empty strings or sha256 not 64 hex), PATH_ESCAPES, FILE_MISSING (no verified
-    file at that path), HASH_MISMATCH (the verified file has a different sha256) or SECTION_MISSING
-    (`sections[section]` absent or null). RESOLVED results also carry `path`, `section` and
-    `section_value` (the parsed section). `cache` memoizes parsed files by (path, sha256).
+    (path/section not non-empty strings or sha256 not 64 hex), PATH_ESCAPES, FILE_MISSING (no
+    stored file at that path), HASH_MISMATCH (the file's bytes, hashed again on every call, do not
+    match both its stored sha256 and the reference's) or SECTION_MISSING (`sections[section]`
+    absent or null). RESOLVED results also carry `path`, `section` and `section_value` (the parsed
+    section). `cache` memoizes parsed files by (path, sha256) and is filled from verified bytes only.
     """
     if not isinstance(source, dict):
         return {"status": "MISSING"}
@@ -60,7 +73,7 @@ def resolve_source_in(files: FilesLookup, source: Any,
     if found is None:
         return {"status": "FILE_MISSING", "path": rel_path, "section": section}
     stored_digest, content = found
-    if stored_digest != digest:
+    if stored_digest != digest or not _hashes_to(content, digest):
         return {"status": "HASH_MISMATCH", "path": rel_path, "section": section}
     key = (rel_path, digest)
     parsed = cache.get(key) if cache is not None else None
@@ -84,6 +97,19 @@ def _unavailable(message: str, tried: list[dict[str, Any]]) -> LensError:
     return LensError("INDEX_UNAVAILABLE", message, hint=BUILD_HINT, details={"tried": tried})
 
 
+def _semantics_mismatch(conn: sqlite3.Connection) -> str | None:
+    """Why this reader cannot use the index: it was built with another vocabulary or with other
+    index-producing code, so its facts and facets would not mean what the reader assumes."""
+    expected = {"vocabulary_digest": load_vocabulary().digest, "index_semantics": index_fingerprint()}
+    for key, mine in expected.items():
+        row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        stored = "none" if row is None else str(row[0])[:16]
+        if row is None or row[0] != mine:
+            return (f"reader mismatch: {key} of the index is {stored}, this reader has {mine[:16]}; "
+                    "the index was built by other vocabulary or indexing code")
+    return None
+
+
 def _connect(path: Path) -> tuple[sqlite3.Connection | None, str | None]:
     """Open `path` read-only and check it is an index of this schema. Returns (conn, problem)."""
     if not path.exists():
@@ -104,6 +130,10 @@ def _connect(path: Path) -> tuple[sqlite3.Connection | None, str | None]:
         if version != INDEX_SCHEMA_VERSION:
             conn.close()
             return None, f"schema mismatch: index_schema_version {version!r}, expected {INDEX_SCHEMA_VERSION!r}"
+        mismatch = _semantics_mismatch(conn)
+        if mismatch is not None:
+            conn.close()
+            return None, mismatch
     except sqlite3.Error as exc:
         if conn is not None:
             conn.close()
@@ -378,33 +408,75 @@ class Index:
     # Evidence -------------------------------------------------------------------------------
 
     def evidence_refs(self, record_pk: int) -> list[dict[str, Any]]:
-        """Evidence reference rows of a record ordered by field (status as recorded at build)."""
-        return self._rows("SELECT * FROM evidence_refs WHERE record_pk=? ORDER BY field", (record_pk,))
+        """Evidence reference rows of a record ordered by field. `status` is the LIVE status (see
+        `live_ref_status`); `build_status` is the one recorded at build."""
+        rows = self._rows("SELECT * FROM evidence_refs WHERE record_pk=? ORDER BY field", (record_pk,))
+        return [self._with_live_status(row) for row in rows]
 
     def evidence_ref(self, ref_pk: int) -> dict[str, Any] | None:
-        """One evidence reference row, or None."""
+        """One evidence reference row (as `evidence_refs`), or None."""
         rows = self._rows("SELECT * FROM evidence_refs WHERE ref_pk=?", (ref_pk,))
-        return rows[0] if rows else None
+        return self._with_live_status(rows[0]) if rows else None
 
-    def _evidence_lookup(self, path: str) -> tuple[str, bytes] | None:
-        row = self._conn.execute("SELECT sha256, content FROM evidence_files WHERE path=?", (path,)).fetchone()
-        return (row[0], bytes(row[1])) if row else None
+    def _with_live_status(self, row: dict[str, Any]) -> dict[str, Any]:
+        row["build_status"] = row["status"]
+        row["status"] = self.live_ref_status(row)
+        return row
+
+    def live_ref_status(self, ref: Mapping[str, Any]) -> str:
+        """The status of a reference row (with its build `status`) against the bytes the index
+        holds now.
+
+        A reference that reached a stored file at build (RESOLVED, SECTION_MISSING) is resolved
+        again from verified bytes. A reference the build rejected keeps that status, and so does a
+        license notice reference (it names no sha256).
+        """
+        status = ref["status"]
+        if status not in ("RESOLVED", "SECTION_MISSING") or ref["field"] == NOTICE_FIELD:
+            return status
+        if ref["section"] is not None:
+            return self.resolve_source({key: ref[key] for key in ("path", "sha256", "section")})["status"]
+        return self.evidence_state(ref["path"], ref["sha256"])[0]
+
+    def _evidence_lookup(self, path: str) -> tuple[Any, Any] | None:
+        """(stored sha256, stored content) of an evidence file, unverified, or None."""
+        try:
+            row = self._conn.execute("SELECT sha256, content FROM evidence_files WHERE path=?",
+                                     (path,)).fetchone()
+        except sqlite3.Error:  # e.g. content rewritten as text that is not UTF-8
+            return None, None
+        return (row[0], row[1]) if row else None
+
+    def evidence_state(self, path: Any, sha256: Any) -> tuple[str, bytes | None]:
+        """(status, content) of the evidence file `path` expected to hash to `sha256`: RESOLVED
+        with its LF bytes only when the bytes hash to `sha256` and the stored digest column equals
+        it too, else PATH_ESCAPES, FILE_MISSING or HASH_MISMATCH with None."""
+        rel_path = corpus_relative_path(path)
+        if rel_path is None:
+            return "PATH_ESCAPES", None
+        found = self._evidence_lookup(rel_path)
+        if found is None:
+            return "FILE_MISSING", None
+        stored, content = found
+        if stored != sha256 or not _hashes_to(content, sha256):
+            return "HASH_MISMATCH", None
+        return "RESOLVED", content
+
+    def evidence_damaged(self, path: str) -> bool:
+        """True when a stored evidence file's bytes no longer hash to its own digest column."""
+        found = self._evidence_lookup(path)
+        return found is not None and not _hashes_to(found[1], found[0])
 
     def evidence_file(self, path: str, sha256: str) -> bytes | None:
         """LF bytes of a verified evidence file with that path and sha256, else None."""
-        rel_path = corpus_relative_path(path)
-        if rel_path is None:
-            return None
-        row = self._conn.execute("SELECT content FROM evidence_files WHERE path=? AND sha256=?",
-                                 (rel_path, sha256)).fetchone()
-        return bytes(row[0]) if row else None
+        return self.evidence_state(path, sha256)[1]
 
     def evidence_paths(self) -> list[str]:
-        """Paths of all verified evidence files, sorted."""
+        """Paths of all stored evidence files, sorted."""
         return [row[0] for row in self._conn.execute("SELECT path FROM evidence_files ORDER BY path")]
 
     def resolve_source(self, source: Any) -> dict[str, Any]:
-        """`resolve_source_in` against this index's verified evidence files."""
+        """`resolve_source_in` against this index's evidence files (bytes verified on every call)."""
         return resolve_source_in(self._evidence_lookup, source, self._parsed_evidence)
 
     # Projects, licenses, findings -------------------------------------------------------------

@@ -19,8 +19,10 @@ Budgeting:
   long echoed values are shortened, `BUILD_FAILED` findings are halved into `findings_omitted`,
   and `details.truncated` is true whenever anything was cut.
 
-Cursors are urlsafe base64 (no padding) of canonical JSON `{"v": 1, "s": snapshot_id, "q":
-query_digest, "o": offset}`.
+Cursors are urlsafe base64 (no padding) of canonical JSON `{"v": 2, "r": reader, "s": snapshot_id,
+"q": query_digest, "o": offset}`, where `reader` is the first 16 hex of
+`semantics.reader_fingerprint()`: an offset means something only under the code and vocabulary that
+ordered the results.
 """
 
 from __future__ import annotations
@@ -34,11 +36,14 @@ from typing import Any, Callable
 
 from .canonical import canonical_json
 from .errors import EXIT_CODES, LensError
+from .semantics import reader_fingerprint
 
 DEFAULT_MAX_OUTPUT_BYTES = 32768
 MIN_MAX_OUTPUT_BYTES = 2048
 MAX_MAX_OUTPUT_BYTES = 262144
-CURSOR_VERSION = 1
+CURSOR_VERSION = 2
+_CURSOR_KEYS = frozenset({"v", "r", "s", "q", "o"})
+_RESTART_HINT = "Restart the search without a cursor."
 
 _OUTPUT_HINT = ("Raise max_output_bytes (at most 262144), lower limit, request fewer fields or "
                 "queries, or narrow evidence/prescription to named sections.")
@@ -390,21 +395,28 @@ def query_digest(normalized_query: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json(normalized_query).encode("utf-8")).hexdigest()[:16]
 
 
+def cursor_reader() -> str:
+    """The reader fingerprint as cursors carry it."""
+    return reader_fingerprint()[:16]
+
+
 def encode_cursor(snapshot_id: str, digest: str, offset: int) -> str:
     """The continuation cursor for an absolute offset into a query's ordered result list."""
-    payload = canonical_json({"v": CURSOR_VERSION, "s": snapshot_id, "q": digest, "o": offset})
+    payload = canonical_json({"v": CURSOR_VERSION, "r": cursor_reader(), "s": snapshot_id, "q": digest,
+                              "o": offset})
     return base64.urlsafe_b64encode(payload.encode("utf-8")).rstrip(b"=").decode("ascii")
 
 
 def decode_cursor(cursor: Any, snapshot_id: str, digest: str, pointer: str = "/cursor") -> int:
-    """The absolute offset a cursor encodes, after checking it belongs to this snapshot and query.
+    """The absolute offset a cursor encodes, after checking it belongs to this reader, snapshot
+    and query.
 
-    Raises CURSOR_INVALID (undecodable), SNAPSHOT_MISMATCH (made on another index snapshot) or
-    CURSOR_MISMATCH (made for a different query).
+    Raises CURSOR_INVALID (undecodable, or a version 1 cursor), CURSOR_SEMANTICS_MISMATCH (made by
+    a reader with other query code or vocabulary), SNAPSHOT_MISMATCH (made on another index
+    snapshot) or CURSOR_MISMATCH (made for a different query).
     """
-    def invalid(reason: str) -> LensError:
-        return LensError("CURSOR_INVALID", f"the cursor cannot be decoded: {reason}",
-                         hint="Pass next_cursor exactly as returned, with the same query.",
+    def invalid(reason: str, hint: str = "Pass next_cursor exactly as returned, with the same query.") -> LensError:
+        return LensError("CURSOR_INVALID", f"the cursor cannot be decoded: {reason}", hint=hint,
                          details={"pointer": pointer})
 
     if not isinstance(cursor, str) or not cursor or len(cursor) > 512:
@@ -414,12 +426,22 @@ def decode_cursor(cursor: Any, snapshot_id: str, digest: str, pointer: str = "/c
         data = json.loads(raw.decode("utf-8"))
     except (binascii.Error, ValueError, UnicodeDecodeError):
         raise invalid("not a cursor") from None
-    if not isinstance(data, dict) or set(data) != {"v", "s", "q", "o"} or data["v"] != CURSOR_VERSION:
+    if isinstance(data, dict) and set(data) == _CURSOR_KEYS - {"r"} and data["v"] == 1:
+        raise invalid("it is a version 1 cursor, which does not record the reader that ordered the results",
+                      _RESTART_HINT)
+    if not isinstance(data, dict) or set(data) != _CURSOR_KEYS or data["v"] != CURSOR_VERSION:
         raise invalid("unknown cursor format")
     offset = data["o"]
-    if not isinstance(data["s"], str) or not isinstance(data["q"], str) or isinstance(offset, bool) \
+    if not all(isinstance(data[key], str) for key in ("r", "s", "q")) or isinstance(offset, bool) \
             or not isinstance(offset, int) or offset < 0:
         raise invalid("malformed cursor fields")
+    if data["r"] != cursor_reader():
+        raise LensError(
+            "CURSOR_SEMANTICS_MISMATCH",
+            "the cursor was made by a reader with different query code or vocabulary, so its offset "
+            "does not continue the same ordered results",
+            hint=_RESTART_HINT,
+            details={"pointer": pointer, "cursor_reader": data["r"], "reader": cursor_reader()})
     if data["s"] != snapshot_id:
         raise LensError(
             "SNAPSHOT_MISMATCH",

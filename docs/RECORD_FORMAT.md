@@ -223,6 +223,92 @@ Two checks sit beside the value and are **not** values:
 
 A missing value is left out. An unknown field leaves the field constraint unconfirmed.
 
+## Provenance checks
+
+These members compare source data. They are kept for review, are never values, and the retriever
+neither matches nor ranks them (they are not typed facts; a constraint reaching one is
+UNCONFIRMED `COMPARISON_ONLY`, and naming one as a target, preference, range or field is an
+error):
+
+| member | compares |
+|---|---|
+| `first_order.engine_check` | engine paraxial values against the source's |
+| `aperture.property_list_comparison`, `field.property_list_comparison` | the collection's property list |
+| `field.prescription_dump_check` | the upstream dump's field table against the design file's |
+| `materials.catalog_comparisons` | published catalog glasses of the same name |
+
+A new check member must be added to `fact_extraction.check_members` in
+`src/os_optics_lens/vocabulary.json` and to the evaluator.
+
+## Sampling grids
+
+`sampled_field_fractions` on a performance entry (or another fact object) lists the ordered
+sample positions behind a sampled value such as an interval MTF minimum. It is a comparison
+condition of that value: queries pin it with `required_sampled_field_fractions`, and `compare`
+treats different grids as not comparable.
+
+## Evidence extracts
+
+An evidence extract is a committed JSON file that holds the sourced data a record's facts rest on.
+Every extract follows one contract:
+
+- the top level is a JSON object;
+- `schema` is `"opensci.lens.evidence_extract"`;
+- `record_id` (a string) names the record the extract belongs to;
+- `sections` is a non-empty object, and no member of it is `null`. A section is the unit a
+  reference addresses; its value is any other JSON value;
+- every other top-level member is metadata (for example `source`, `license`, `scope`,
+  `upstream_archive`, `schema_version`). It travels with the file but is **not addressable**: no
+  reference and no `inspect --evidence` name reaches it.
+
+References:
+
+- a fact's `source` is `{path, sha256, section}` and names one member of `sections`;
+- `collection.evidence_extract` is `{path, sha256}` and names the record's extract as a whole, so
+  `inspect --evidence` can address each of its sections;
+- `path` is corpus-relative with `/` separators, and `sha256` is the SHA-256 of the file's
+  LF-normalized bytes.
+
+Strict intake enforces the object root, the `schema` string and the `sections` object
+(`EVIDENCE_MALFORMED`, naming the file and the field; a warning under
+`--allow-unresolved-evidence`, and the reference then stays unresolved). The index stores only
+conforming extracts and re-hashes their bytes on every read.
+
+## Member types
+
+The builder indexes, hashes or iterates the members below, so each must have its stated type when
+present (`null` counts as absent unless noted). A violation is an error finding naming the file and
+the field (`INVALID_FIELD` unless noted), never a crash.
+
+| member | type |
+|---|---|
+| `aperture`, `cost_proxy`, `field`, `first_order`, `image_format`, `spectrum`, `validation`, `analysis_evidence` | object |
+| each `analysis_evidence.<study>`, its `status` | object, string |
+| every section, fact object and performance entry: `basis`, `definition`, `condition`, `eligible_for`, `state` | string |
+| the same: `conditions` | object or string |
+| the same: `system_aperture` | boolean |
+| the same: `sampled_field_fractions` | non-empty list of finite numbers |
+| the same: `source` | evidence reference object (`EVIDENCE_MALFORMED`, downgradable) |
+| a section's `<member>_basis` | string |
+| `design.lens_type`, `design.design_scope`, `design.conjugate` | string |
+| `design.module_role` | non-empty string; `null` is invalid (see below) |
+| `design.aperture_validity` | object |
+| `collection.license`, its `copyright` and `spdx` | object, string |
+| `collection.evidence_extract` | object; `null` is invalid (`EVIDENCE_MALFORMED`, downgradable) |
+| `native_project.engine_version`, `validation.paraxial`, `validation.field`, `validation.project_check` | string |
+| a Project's `configurations[].label` and `.name` | string (`PROJECT_CONFIGURATION_INVALID`) |
+| a batch manifest's `collection`, `collection.collection_id` | object, non-empty string (both required) |
+
+A record, Project, batch manifest or evidence file whose top level is not an object (the literal
+`null` included) is an error finding too; a discovered file is never skipped silently.
+
+### `design.module_role`
+
+Optional. For a phone module, where it sits in a device: `main_camera`, `ultrawide`, `telephoto`
+or `front_camera` (aliases `main`, `ultra_wide`, `tele`, `front`). It is a record-level facet, not
+a statement about what the prescription is. Another string is indexed verbatim with an
+`UNKNOWN_TERM` warning.
+
 ## Materials
 
 `materials.model_glasses` holds every glass defined from the source's own per-surface index table

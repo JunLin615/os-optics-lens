@@ -34,6 +34,7 @@ from .vocabulary import Vocabulary, load_vocabulary
 
 RECORD_SCHEMA = "opensci.lens.record"
 PROJECT_SCHEMA = "opensci.project"
+EVIDENCE_SCHEMA = "opensci.lens.evidence_extract"
 SUPPORTED_SCHEMA_VERSIONS = ("1.0", "1.1")
 RECORD_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 MAX_REVISION = 2**63 - 1
@@ -55,6 +56,46 @@ EVIDENCE_CODES = {
     MALFORMED: "EVIDENCE_MALFORMED",
 }
 PERFORMANCE_NUMERIC = re.compile(r"(value(_[a-z_]+)?|(min|max)_[a-z_]+)")
+
+OBJECT_SECTIONS = ("aperture", "cost_proxy", "field", "first_order", "image_format", "spectrum")
+"""Sections that, when present and not null, must be objects (design is required separately)."""
+TEXT_MEMBERS = ("basis", "condition", "definition", "eligible_for", "state")
+"""Members of a section or fact object that are indexed as text."""
+_UNREADABLE = object()
+"""`load_json` result for a file that could not be read or parsed (its finding is already made)."""
+
+
+def _is_object(value: Any) -> bool:
+    return isinstance(value, dict)
+
+
+def _is_text(value: Any) -> bool:
+    return isinstance(value, str)
+
+
+def _json_type(value: Any) -> str:
+    for kind, name in ((bool, "a boolean"), ((int, float), "a number"), (str, "a string"), (list, "a list"),
+                       (dict, "an object")):
+        if isinstance(value, kind):
+            return name
+    return "null"
+
+
+def evidence_extract_problem(data: Any) -> tuple[str, str] | None:
+    """(field, problem) when parsed evidence breaks the extract contract of docs/RECORD_FORMAT.md
+    (object root, `schema`, a non-empty `sections` object without null members), else None.
+    `field` is '' for the whole document."""
+    if not isinstance(data, dict):
+        return "", f"the root must be a JSON object, not {_json_type(data)}"
+    if data.get("schema") != EVIDENCE_SCHEMA:
+        return "schema", f"schema must be {EVIDENCE_SCHEMA!r}"
+    sections = data.get("sections")
+    if not isinstance(sections, dict) or not sections:
+        return "sections", "sections must be a non-empty object"
+    for name in sorted(sections):
+        if sections[name] is None:
+            return f"sections.{name}", f"sections.{name} must not be null"
+    return None
 
 
 @dataclass
@@ -190,7 +231,7 @@ class _Loader:
         return state
 
     def parsed_evidence(self, state: _FileState) -> None:
-        """Parse an evidence file once; sets `parsed` (dict with a `sections` object) or `problem`."""
+        """Parse an evidence file once; sets `parsed` (a conforming evidence extract) or `problem`."""
         if state.parsed is not None or state.problem is not None or state.content is None:
             return
         try:
@@ -198,8 +239,10 @@ class _Loader:
         except JsonFormatError as exc:
             state.problem = exc.message
             return
-        if not isinstance(data, dict) or not isinstance(data.get("sections"), dict):
-            state.problem = "an evidence file must be a JSON object with a sections object"
+        broken = evidence_extract_problem(data)
+        if broken is not None:
+            name, problem = broken
+            state.problem = f"field {name}: {problem}" if name else problem
             return
         state.parsed = data
 
@@ -230,7 +273,7 @@ class _Loader:
             self.add(ERROR, "MALFORMED_JSON", record_id, file, pointer_to_field(exc.pointer), exc.message)
         except OSError as exc:
             self.add(ERROR, "MALFORMED_JSON", record_id, file, "", f"cannot read file: {exc.strerror}")
-        return None
+        return _UNREADABLE
 
     def require(self, record: dict[str, Any], dotted: str, check, expectation: str, rid: str | None,
                 file: str, missing_severity: str = ERROR, missing_code: str = "MISSING_FIELD") -> Any:
@@ -278,8 +321,14 @@ class _Loader:
             self.require(record, "design.design_family_id", lambda v: isinstance(v, str) and v,
                          "a non-empty string", rid, file, missing_severity=WARNING, missing_code="MISSING_FAMILY")
             design = record["design"]
-            if "lens_type" in design and design["lens_type"] is not None and not isinstance(design["lens_type"], str):
-                self.add(ERROR, "INVALID_FIELD", rid, file, "design.lens_type", "design.lens_type must be a string")
+            for member in ("lens_type", "design_scope", "conjugate"):
+                self.optional(design, member, _is_text, "a string or null", f"design.{member}", rid, file)
+            self.optional(design, "aperture_validity", _is_object, "an object or null", "design.aperture_validity",
+                          rid, file)
+            if "module_role" in design and not (isinstance(design["module_role"], str)
+                                                and design["module_role"].strip()):
+                self.add(ERROR, "INVALID_FIELD", rid, file, "design.module_role",
+                         "design.module_role must be a non-empty string")
             for member in ("function_tags", "application_tags", "structure_tags"):
                 self.check_string_list(design, member, f"design.{member}", rid, file)
             if "configuration_count" in design and not (
@@ -297,13 +346,94 @@ class _Loader:
         self.require(record, "record_hash", lambda v: isinstance(v, str) and HEX64.fullmatch(v),
                      "64 lower-case hex characters", rid, file)
         self.require(record, "record_hash_method", lambda v: isinstance(v, str), "a string", rid, file)
+        self.check_record_members(record, rid, file)
         self.check_numeric_values(record, "", rid, file)
+        self.check_member_types(record, "", rid, file)
         entries = record.get("configurations")
         if isinstance(entries, list):
             for index, entry in enumerate(entries):
                 if isinstance(entry, dict):
-                    self.check_numeric_values(entry, f"configurations[{index}].", rid, file)
+                    prefix = f"configurations[{index}]."
+                    self.check_numeric_values(entry, prefix, rid, file)
+                    self.check_member_types(entry, prefix, rid, file)
+                    for section, member in (("spectrum", "band_facets"), ("image_format", "format_facets")):
+                        if isinstance(entry.get(section), dict):
+                            self.check_string_list(entry[section], member, f"{prefix}{section}.{member}", rid, file)
         return valid_id if isinstance(valid_id, str) else None
+
+    def optional(self, container: dict[str, Any], member: str, check, expectation: str, dotted: str,
+                 rid: str | None, file: str) -> None:
+        """An optional member: absent, null or accepted by `check`; else INVALID_FIELD."""
+        value = container.get(member)
+        if value is not None and not check(value):
+            self.add(ERROR, "INVALID_FIELD", rid, file, dotted, f"{dotted} must be {expectation}",
+                     expected=expectation, actual=value)
+
+    def check_record_members(self, record: dict[str, Any], rid: str | None, file: str) -> None:
+        """Types of the record-level members outside the sections."""
+        native = record.get("native_project")
+        if isinstance(native, dict):
+            self.optional(native, "engine_version", _is_text, "a string or null", "native_project.engine_version",
+                          rid, file)
+        collection = record.get("collection")
+        if isinstance(collection, dict):
+            self.optional(collection, "license", _is_object, "an object or null", "collection.license", rid, file)
+            if isinstance(collection.get("license"), dict):
+                for member in ("copyright", "spdx"):
+                    self.optional(collection["license"], member, _is_text, "a string or null",
+                                  f"collection.license.{member}", rid, file)
+        self.optional(record, "validation", _is_object, "an object or null", "validation", rid, file)
+        if isinstance(record.get("validation"), dict):
+            for member in ("paraxial", "field", "project_check"):
+                self.optional(record["validation"], member, _is_text, "a string or null", f"validation.{member}",
+                              rid, file)
+
+    def check_member_types(self, container: dict[str, Any], prefix: str, rid: str | None, file: str) -> None:
+        """Types of every section and fact-object member the builder indexes or the query layer
+        iterates, in a record or in one `configurations[]` entry."""
+        rules = self.vocab.fact_extraction
+        skipped = set(rules.get("skip_members", [])) | set(rules.get("check_members", []))
+        for section in (*OBJECT_SECTIONS, "analysis_evidence", "design"):
+            if section in OBJECT_SECTIONS or section == "analysis_evidence":
+                self.optional(container, section, _is_object, "an object or null", f"{prefix}{section}", rid, file)
+            content = container.get(section)
+            if not isinstance(content, dict) or (prefix and section == "design"):
+                continue
+            where = f"{prefix}{section}"
+            if section != "analysis_evidence":
+                self.check_fact_object(content, where, rid, file)
+            for member, value in content.items():
+                if member.endswith("_basis"):
+                    self.optional(content, member, _is_text, "a string or null", f"{where}.{member}", rid, file)
+                if member in skipped:
+                    continue
+                if section == "analysis_evidence":
+                    self.optional(content, member, _is_object, "an object or null (a study)", f"{where}.{member}",
+                                  rid, file)
+                    if isinstance(value, dict):
+                        self.optional(value, "status", _is_text, "a string or null", f"{where}.{member}.status",
+                                      rid, file)
+                if isinstance(value, dict):
+                    self.check_fact_object(value, f"{where}.{member}", rid, file)
+        performance = container.get("performance")
+        if isinstance(performance, list):
+            for index, entry in enumerate(performance):
+                if isinstance(entry, dict):
+                    self.check_fact_object(entry, f"{prefix}performance[{index}]", rid, file)
+
+    def check_fact_object(self, obj: dict[str, Any], where: str, rid: str | None, file: str) -> None:
+        for member in TEXT_MEMBERS:
+            self.optional(obj, member, _is_text, "a string or null", f"{where}.{member}", rid, file)
+        self.optional(obj, "conditions", lambda v: isinstance(v, (dict, str)), "an object, a string or null",
+                      f"{where}.conditions", rid, file)
+        self.optional(obj, "system_aperture", lambda v: isinstance(v, bool), "true, false or null",
+                      f"{where}.system_aperture", rid, file)
+        self.optional(obj, "sampled_field_fractions",
+                      lambda v: isinstance(v, list) and bool(v) and all(is_number(item) for item in v),
+                      "a non-empty list of finite numbers or null", f"{where}.sampled_field_fractions", rid, file)
+        if obj.get("source") is not None and not isinstance(obj["source"], dict):
+            self.evidence_problem(MALFORMED, rid, file, f"{where}.source",
+                                  f"{where}.source must be an evidence reference object {{path, sha256, section}}")
 
     def check_string_list(self, container: dict[str, Any], member: str, dotted: str, rid: str | None, file: str) -> None:
         if member in container and not (isinstance(container[member], list)
@@ -480,6 +610,9 @@ class _Loader:
             refs.append(self.resolve_ref(ref_field, "source", obj, rid, file))
         collection = record.get("collection") if isinstance(record.get("collection"), dict) else {}
         extract = collection.get("evidence_extract")
+        if "evidence_extract" in collection and not isinstance(extract, dict):
+            self.evidence_problem(MALFORMED, rid, file, "collection.evidence_extract",
+                                  "collection.evidence_extract must be an object {path, sha256}")
         if isinstance(extract, dict) and not {"path", "sha256", "section"} <= extract.keys():
             refs.append(self.resolve_ref("collection.evidence_extract", "evidence_extract", extract, rid, file))
         notice = self.resolve_notice(record, rid, file)
@@ -519,10 +652,11 @@ class _Loader:
         for path in record_files:
             file = self.rel(path)
             data = self.load_json(path)
-            if data is None:
+            if data is _UNREADABLE:
                 continue
             if not isinstance(data, dict):
-                self.add(ERROR, "MALFORMED_JSON", None, file, "", "a record must be a JSON object")
+                self.add(ERROR, "MALFORMED_JSON", None, file, "",
+                         f"a record must be a JSON object, not {_json_type(data)}")
                 continue
             loaded.append((file, data, self.validate_record(data, file)))
 
@@ -646,16 +780,17 @@ class _Loader:
             for path in paths:
                 file = self.rel(path)
                 data = self.load_json(path)
-                if data is None:
+                if data is _UNREADABLE:
                     continue
                 if not isinstance(data, dict):
-                    self.add(ERROR, "MALFORMED_JSON", None, file, "", "a batch manifest must be a JSON object")
+                    self.add(ERROR, "MALFORMED_JSON", None, file, "",
+                             f"a batch manifest must be a JSON object, not {_json_type(data)}")
                     continue
-                collection = data.get("collection")
-                collection_id = collection.get("collection_id") if isinstance(collection, dict) else None
-                if not isinstance(collection_id, str):
-                    self.add(ERROR, "MISSING_FIELD", None, file, "collection.collection_id",
-                             "a batch manifest needs collection.collection_id")
+                if self.require(data, "collection", _is_object, "an object", None, file) is None:
+                    continue
+                collection_id = self.require(data, "collection.collection_id",
+                                             lambda v: isinstance(v, str) and v, "a non-empty string", None, file)
+                if collection_id is None:
                     continue
                 if collection_id != collection_dir:
                     self.add(WARNING, "BATCH_MANIFEST_MISMATCH", None, file, "collection.collection_id",
@@ -675,7 +810,7 @@ class _Loader:
         for file, data, rid in loaded:
             collection = data.get("collection") if isinstance(data.get("collection"), dict) else {}
             collection_id = collection.get("collection_id")
-            if rid is None or collection_id not in listed:
+            if rid is None or not isinstance(collection_id, str) or collection_id not in listed:
                 continue
             if rid not in listed[collection_id]:
                 self.add(WARNING, "BATCH_MANIFEST_MISMATCH", rid, file, "record_id",

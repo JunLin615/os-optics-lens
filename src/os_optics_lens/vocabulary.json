@@ -73,6 +73,12 @@
       "controlled": false,
       "description": "Name of the aperture fact the design file declares as its system aperture (aperture.<name>.system_aperture true)."
     },
+    "module_role": {
+      "level": "record",
+      "controlled": true,
+      "warn_unknown": true,
+      "description": "Where a phone module sits in its device (design.module_role); not a statement about what the prescription is."
+    },
     "stop_state": {
       "level": "record",
       "controlled": true,
@@ -151,6 +157,7 @@
       "visible"
     ],
     "image_format": ["aps_c", "full_frame"],
+    "module_role": ["front_camera", "main_camera", "telephoto", "ultrawide"],
     "conjugate": ["finite_to_finite", "finite_to_infinite", "infinite_to_finite", "infinite_to_infinite"],
     "field_kind": ["angular", "image_height", "object_height"],
     "stop_state": ["no_stop", "stop_blocking", "stop_not_blocking"],
@@ -181,6 +188,12 @@
     },
     "conjugate": {
       "infinity": "infinite_to_finite"
+    },
+    "module_role": {
+      "front": "front_camera",
+      "main": "main_camera",
+      "tele": "telephoto",
+      "ultra_wide": "ultrawide"
     }
   },
   "ambiguous": {
@@ -231,7 +244,7 @@
       "unsupported_constructs",
       "validation"
     ],
-    "check_members": ["engine_check", "property_list_comparison"],
+    "check_members": ["catalog_comparisons", "engine_check", "prescription_dump_check", "property_list_comparison"],
     "skip_members": [
       "application_tags",
       "band_facets",

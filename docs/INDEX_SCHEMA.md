@@ -2,7 +2,7 @@
 
 The retrieval index is a single SQLite file **derived** from the committed records. The records
 and their native Projects remain the source of truth; an index file is never committed. This
-document describes index schema version `1` as `os_optics_lens.build` writes it and
+document describes index schema version `2` as `os_optics_lens.build` writes it and
 `os_optics_lens.store` reads it, the findings a build reports, the reproducibility rules, and how
 to validate an incoming batch. [RECORD_FORMAT.md](RECORD_FORMAT.md) defines the records the index
 reads; [RETRIEVAL.md](RETRIEVAL.md) describes the CLI and the query semantics.
@@ -42,10 +42,11 @@ os-optics-lens index dump     [--index FILE]
 
   There is no lookup in the working directory. The file is opened read-only as
   `file:<absolute path>?mode=ro&immutable=1`, so read-only installs and read-only trees work and
-  no `-wal`/`-shm`/journal sidecars are created. A missing file, a corrupt file, a missing table
-  or a different `index_schema_version` raises `INDEX_UNAVAILABLE` (exit code 5). Its
-  `details.tried` lists `[{source, path, problem}]`, and its hint names `index build --corpus <dir>
-  --out <file>`.
+  no `-wal`/`-shm`/journal sidecars are created. A missing file, a corrupt file, a missing table,
+  a different `index_schema_version`, or a `vocabulary_digest` or `index_semantics` that differs
+  from the reader's (see [Reader compatibility](#reader-compatibility)) raises `INDEX_UNAVAILABLE`
+  (exit code 5). Its `details.tried` lists `[{source, path, problem}]`, and its hint names
+  `index build --corpus <dir> --out <file>`.
 
 ## Tables
 
@@ -57,7 +58,7 @@ to records by `record_id` and to configurations by `configuration_id`.
 
 | key | value |
 |---|---|
-| `index_schema_version` | `"1"`; readers refuse any other value |
+| `index_schema_version` | `"2"`; readers refuse any other value (version 1 lacked `facts.sampled_field_fractions_json`) |
 | `builder` | `"os-optics-lens <version>"` |
 | `builder_version` | package version, e.g. `"0.1.0"` |
 | `snapshot_id` | 16 hex characters (see [Snapshot identity](#snapshot-identity)) |
@@ -66,6 +67,7 @@ to records by `record_id` and to configurations by `configuration_id`.
 | `corpus_digest` | SHA-256 of the canonical JSON of the sorted rows `[record_id, revision, record_hash, project_sha256, [[evidence path, sha256], ...]]` |
 | `allow_unresolved_evidence` | `"0"` or `"1"` |
 | `vocabulary_digest` | SHA-256 of the canonical JSON of the packaged `vocabulary.json` |
+| `index_semantics` | fingerprint of the index-producing sources (see [Reader compatibility](#reader-compatibility)) |
 
 ### `records`
 
@@ -120,12 +122,13 @@ A record without `configurations` has exactly one row:
 basis TEXT NOT NULL)`, indexed on `(facet, value)` and `(record_pk, config_pk)`.
 
 - **Record-level** facets have `config_pk` NULL: `collection`, `family`, `design_scope`,
-  `design_type`, `source_lens_type`, `function`, `application`, `structure`, `stop_state`,
-  `validation`.
+  `design_type`, `source_lens_type`, `function`, `application`, `structure`, `module_role`,
+  `stop_state`, `validation`.
 - **Configuration-level** facets have `config_pk` set: `band`, `image_format`, `conjugate`,
   `field_kind`, `system_aperture`, `evidence`.
-- `value` is the canonical lower_snake_case term. `source_lens_type` is kept verbatim, and an
-  unknown tag is indexed normalized, with an `UNKNOWN_TERM` warning.
+- `value` is the canonical lower_snake_case term. `source_lens_type` is kept verbatim. An
+  unknown tag is indexed normalized and an unknown `module_role` verbatim, both with an
+  `UNKNOWN_TERM` warning.
 - `basis` is `RECORD` when the value is copied from the record and `VOCABULARY_MAPPING` when it is
   derived through `vocabulary.json`, for example `design_type` mapped from `lens_type`, or the
   `imaging` function.
@@ -159,15 +162,26 @@ table.** Both come from the same view, so they cannot disagree.
 | `qualifiers_json TEXT` | performance-entry scalar/list members that qualify the value (e.g. `field_fraction`, `frequency_lp_mm`) |
 | `value_paths TEXT` | JSON list of numeric value-like members (`["value"]`, `["sagittal","tangential"]`, `["min_nm","max_nm"]`) |
 | `constraint_form TEXT` | JSON `{scope, metric, path}`: the fixture-form constraint that addresses this fact |
+| `sampled_field_fractions_json TEXT` | canonical JSON of the sampling grid (`sampled_field_fractions`) of the object the fact resolves to (a performance entry, member object, section or study), else NULL; a comparison condition for `fields` and `compare` |
 | `source_ref_pk INTEGER` | the `evidence_refs` row of the fact's own `source`, else NULL |
+
+Provenance checks (`engine_check`, `property_list_comparison`, `prescription_dump_check`,
+`catalog_comparisons`; `fact_extraction.check_members`) never become facts.
 
 ### `evidence_files(path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, content BLOB NOT NULL)`
 
 These are the evidence extracts the records reference. `content` holds the LF-normalized bytes,
 and `sha256` is their hash. Only files that passed verification are inserted: the path is inside
-the corpus, the bytes match a referenced `sha256`, and the content is a JSON object with a
-`sections` object. At query time, evidence is resolved only from this table
-(`store.resolve_source_in`), never from the filesystem.
+the corpus, the bytes match a referenced `sha256`, and the content follows the
+[evidence extract contract](RECORD_FORMAT.md#evidence-extracts). At query time, evidence is
+resolved only from this table (`store.resolve_source_in`), never from the filesystem.
+
+SQLite has no page checksums, so **every read verifies the bytes**: their SHA-256 is recomputed and
+must equal both the `sha256` column and the digest the reference expects. Otherwise the status is
+`HASH_MISMATCH` (`FILE_MISSING` if the row is gone), a constraint that needs the evidence is
+`UNCONFIRMED` (`EVIDENCE_UNRESOLVED`), and none of the bytes are parsed or shown. Only verified
+content is cached. `inspect --evidence` of a record with damaged evidence fails with
+`INDEX_UNAVAILABLE` (rebuild). A reference that was already unresolved at build is not damage.
 
 ### `evidence_refs`
 
@@ -188,8 +202,13 @@ TEXT, sha256 TEXT, section TEXT, status TEXT NOT NULL)`, indexed on `record_pk` 
 - `NOTICE_MISMATCH`, which applies only to license notices.
 
 A status other than `RESOLVED` can occur only in an index built with `--allow-unresolved-evidence`.
-The exception is `PATH_ESCAPES`, which is always an error. This table reports status only.
-Resolution at query time recomputes the result from `evidence_files` (amendment 10.4).
+The exception is `PATH_ESCAPES`, which is always an error.
+
+The column is the status **at build**. Every status a query reports is **live**
+(`Index.evidence_refs`, which keeps the column as `build_status`): a reference that reached a
+stored file at build (`RESOLVED`, `SECTION_MISSING`) is resolved again from the verified bytes of
+`evidence_files` (amendment 10.4). A reference the build rejected keeps its status, and so does a
+license notice reference, which names no `sha256`.
 
 ### `projects(record_pk INTEGER PRIMARY KEY, sha256 TEXT NOT NULL, content BLOB NOT NULL, native_configuration_ids TEXT)`
 
@@ -228,6 +247,24 @@ page layout.
 
 Search cursors embed the snapshot. A cursor from another snapshot is rejected with
 `SNAPSHOT_MISMATCH` (exit code 4).
+
+## Reader compatibility
+
+A snapshot identifies content. What the content and a result offset mean also depends on the code,
+so both are bound to fingerprints (`os_optics_lens.semantics`): the SHA-256 over the name, length
+and LF-normalized bytes of each file, read through `importlib.resources`, so a CRLF checkout, a
+wheel and every platform agree.
+
+| fingerprint | files | bound to |
+|---|---|---|
+| `index_semantics` (meta) | `build.py`, `canonical.py`, `corpus.py`, `normalize.py`, `vocabulary.py`, `vocabulary.json` | the index: a reader with another value, or another `vocabulary_digest`, refuses it with `INDEX_UNAVAILABLE` and a rebuild hint |
+| reader fingerprint (first 16 hex in each cursor) | `canonical.py`, `evaluate.py`, `normalize.py`, `output.py`, `query.py`, `store.py`, `vocabulary.py`, `vocabulary.json` | the cursor |
+
+A cursor is urlsafe base64 of `{"v": 2, "r": reader, "s": snapshot_id, "q": query_digest, "o":
+offset}`. A cursor whose `r` differs from the reader's is `CURSOR_SEMANTICS_MISMATCH` (exit code
+4), also against an index rebuilt by that reader; a version 1 cursor is `CURSOR_INVALID`. Both
+hints say to restart the search without a cursor. Any edit of a listed file changes its
+fingerprint, so an index built from a modified checkout is rebuilt, not reused.
 
 ## Reproducibility
 
@@ -285,9 +322,9 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 
 | code | severity | meaning |
 |---|---|---|
-| `MALFORMED_JSON` | error | Not parseable, not UTF-8, has a BOM, contains `NaN`/`Infinity`/an overflowing number (a float or an integer beyond the double range), a string or member name with a lone surrogate escape, or nesting deeper than 128 levels (field = JSON pointer location), or the top level is not an object. Applies to records and batch manifests. |
-| `MISSING_FIELD` | error | A required field is absent: `schema`, `record_schema_version`, `record_id`, `record_revision`, `title`, `collection`, `collection.collection_id`, `design`, `native_project`, `native_project.path`, `native_project.sha256`, `spectrum`, `record_hash`, `record_hash_method`; a performance entry's `metric`; a configuration entry's `configuration_id`. |
-| `INVALID_FIELD` | error | The wrong type or value. Includes: `schema` ≠ `opensci.lens.record`; a `record_id` not matching `^[a-z0-9][a-z0-9._-]{0,127}$`; `record_revision` not an int from 1 to 2^63-1; a tag list that is not a list of strings; a numeric fact `value` (also performance `value*`/`min_*`/`max_*` and spectrum `min_nm`/`max_nm`) that is not a finite number or null; `performance` not a list; a 1.0 record carrying `configurations`; malformed or unknown configuration-entry keys; a top-level section that some configuration would inherit. |
+| `MALFORMED_JSON` | error | Not parseable, not UTF-8, has a BOM, contains `NaN`/`Infinity`/an overflowing number (a float or an integer beyond the double range), a string or member name with a lone surrogate escape, or nesting deeper than 128 levels (field = JSON pointer location), or the top level is not an object (the literal `null` included; no discovered file is skipped). Applies to records and batch manifests; the same defects in a Project or an evidence file are `PROJECT_MALFORMED` and `EVIDENCE_MALFORMED`. |
+| `MISSING_FIELD` | error | A required field is absent: `schema`, `record_schema_version`, `record_id`, `record_revision`, `title`, `collection`, `collection.collection_id`, `design`, `native_project`, `native_project.path`, `native_project.sha256`, `spectrum`, `record_hash`, `record_hash_method`; a performance entry's `metric`; a configuration entry's `configuration_id`; a batch manifest's `collection` and `collection.collection_id`. |
+| `INVALID_FIELD` | error | The wrong type or value. Includes: `schema` ≠ `opensci.lens.record`; a `record_id` not matching `^[a-z0-9][a-z0-9._-]{0,127}$`; `record_revision` not an int from 1 to 2^63-1; a tag list that is not a list of strings; a numeric fact `value` (also performance `value*`/`min_*`/`max_*` and spectrum `min_nm`/`max_nm`) that is not a finite number or null; `performance` not a list; a 1.0 record carrying `configurations`; malformed or unknown configuration-entry keys; a top-level section that some configuration would inherit; any member of [RECORD_FORMAT.md, Member types](RECORD_FORMAT.md#member-types) with another type, at the top level or in a configuration entry. |
 | `UNSUPPORTED_SCHEMA_VERSION` | error | `record_schema_version` is not `1.0` or `1.1`. |
 | `RECORD_DIR_MISMATCH` | error | The record directory name differs from `record_id`. |
 | `COLLECTION_DIR_MISMATCH` | warning | The collection directory differs from `collection.collection_id`. |
@@ -315,8 +352,8 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 |---|---|---|
 | `EVIDENCE_FILE_MISSING` † | error | A referenced evidence file does not exist. |
 | `EVIDENCE_HASH_MISMATCH` † | error | The SHA-256 of the file's LF bytes differs from the reference's `sha256`. |
-| `EVIDENCE_SECTION_MISSING` † | error | The file has no non-null `sections.<section>`. |
-| `EVIDENCE_MALFORMED` † | error | The reference has an empty or missing `path`/`section` or a non-hex `sha256`, or the file is not a JSON object with a `sections` object. |
+| `EVIDENCE_SECTION_MISSING` † | error | The file has no `sections.<section>`. |
+| `EVIDENCE_MALFORMED` † | error | The reference has an empty or missing `path`/`section` or a non-hex `sha256`; a fact `source` or `collection.evidence_extract` is not an object; or the file breaks the [evidence extract contract](RECORD_FORMAT.md#evidence-extracts) (the message names the file and the field: root, `schema`, `sections` or `sections.<name>`). |
 | `LICENSE_NOTICE_MISSING` † | error | `collection.license.notice_path` is null, empty or not a string, or names no UTF-8 text file. |
 | `LICENSE_NOTICE_MISMATCH` † | error | The notice does not contain `collection.license.copyright`. |
 | `LICENSE_UNREADABLE` | error | `LICENSE` or `licenses/*.txt` is not UTF-8 text. |
@@ -327,7 +364,7 @@ unresolved; the flag is recorded in `meta` and in the snapshot.
 |---|---|---|
 | `BATCH_MANIFEST_MISMATCH` | error | A manifest's `accepted_record_ids` names a record that is not present in its collection. |
 | `BATCH_MANIFEST_MISMATCH` | warning | A manifest's `collection.collection_id` differs from its directory; or an indexed record is absent from every manifest of its collection (only when the collection has at least one manifest). |
-| `UNKNOWN_TERM` | warning | A `lens_type` or tag is not in the vocabulary. The value is still indexed (lens type under `source_lens_type` only, a tag normalized), so new series work before the vocabulary catches up. |
+| `UNKNOWN_TERM` | warning | A `lens_type`, tag or `module_role` is not in the vocabulary. The value is still indexed (lens type under `source_lens_type` only, a tag normalized, a module role verbatim), so new series work before the vocabulary catches up. |
 | `NO_SYSTEM_APERTURE` | warning | No aperture fact of a configuration is marked `system_aperture: true`. |
 | `UNIT_UNKNOWN` | warning | A numeric fact outside `design.*` has no unit inferable from its name. |
 
