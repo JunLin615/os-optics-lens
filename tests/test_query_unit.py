@@ -251,10 +251,12 @@ class Specification(unittest.TestCase):
         compact = response["result"]["candidates"][0]["constraints"]["c0"]
         self.assertEqual(compact["outcome"], "MATCH")
         self.assertIn("field_end", compact["unpinned"])
-        prose = query.run_request(INDEX, {"mode": "specification", "filters": {"record_ids": ["lenslibrary-1792917"]},
-                                          "constraints": [{"fact": "first_order.effective_focal_length_mm",
-                                                           "op": "gt", "value": 1}]})
-        self.assertIn("_text", prose["result"]["candidates"][0]["constraints"]["c0"]["unpinned"])
+        focal_length = query.run_request(INDEX, {
+            "mode": "specification", "filters": {"record_ids": ["lenslibrary-1792917"]},
+            "constraints": [{"fact": "first_order.effective_focal_length_mm", "op": "gt", "value": 1}],
+        })
+        self.assertEqual(focal_length["result"]["candidates"][0]["constraints"]["c0"]["unpinned"],
+                         {"wavelength_nm": 587.7220645720764})
 
     def test_ranges_and_spectral_span(self) -> None:
         response = query.run_request(INDEX, {
