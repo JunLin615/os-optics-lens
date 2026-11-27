@@ -1,9 +1,12 @@
 """Production CLI regressions for the acceptance follow-up of `0864a9b`.
 
 1. An observation that is not behind the lens on its axis is not an image receiver, so it supplies
-   no image-format, track or back-focus fact.
+   no image-format, track or back-focus fact. "Behind" follows the configuration's light: a source
+   on the far side, a reversed source or a flipped lens leaves the receiver unconfirmed, and a plane
+   attached to a component (`device_instance_id`) is placed in that component's frame first.
 2. A value paired with a `<name>_basis` marker that is not a Project basis never reaches the search
-   projection or ordinary inspection, at any depth.
+   projection or ordinary inspection, at any depth, including `_from_<word>` value names. A nested
+   object or analysis study whose own basis is not a Project basis (or DERIVED) is excluded too.
 
 Both reproductions mutate scratch copies of committed records and keep the committed corpus
 unchanged.
@@ -39,6 +42,14 @@ SENSOR = {"id": "sensor", "scope": ["image_format"],
           "predicates": [{"path": "width_mm", "op": "eq", "value": 36},
                          {"path": "height_mm", "op": "eq", "value": 24}]}
 MONITOR_APERTURE = {"shape": "rectangle", "half_width_mm": 18, "half_height_mm": 12, "center_offset_mm": [0, 0]}
+TRACK = {"id": "track", "fact": "first_order.total_track_mm", "op": "gt", "value": 0}
+BFD = {"id": "bfd", "fact": "first_order.final_powered_vertex_to_sensor_mm", "op": "gt", "value": 0}
+LENS_Q = [0.5, 0.5, 0.5, 0.5]
+"""The committed lens and image-plane orientation: local +Z along design +x."""
+FLIPPED_Q = [-0.5, 0.5, 0.5, -0.5]
+"""`[0, 0, 1, 0] * LENS_Q`: local +Z along design -x."""
+RECEIVER_KEYS = ("image_format.width_mm", "image_format.height_mm", "first_order.total_track_mm",
+                 "first_order.final_powered_vertex_to_sensor_mm")
 
 
 def write_json(path: Path, data: Any) -> bytes:
@@ -110,15 +121,32 @@ class ImageReceiverRole(CliCase):
         cls.addClassCleanup(work.cleanup)
         cls.work = Path(work.name)
 
-    def monitor_corpus(self, name: str, pose: dict[str, Any]) -> Path:
+    def monitor_corpus(self, name: str, pose: dict[str, Any], *, device: str | None = None,
+                       components: dict[str, dict[str, Any]] | None = None) -> Path:
+        """Replace the observation with one rectangle plane; `components` overrides the nominal
+        pose of the named component instances."""
         corpus = ScratchCorpus(self.work, name)
 
         def replace(project: dict[str, Any]) -> None:
-            project["observations"] = [{"observation_id": "entrance_monitor", "absorbing": False,
-                                        "pose": pose, "aperture": copy.deepcopy(MONITOR_APERTURE)}]
+            observation = {"observation_id": "entrance_monitor", "absorbing": False,
+                           "pose": pose, "aperture": copy.deepcopy(MONITOR_APERTURE)}
+            if device is not None:
+                observation["device_instance_id"] = device
+            project["observations"] = [observation]
+            for component in project["components"]:
+                if component["instance_id"] in (components or {}):
+                    component["nominal_pose"] = components[component["instance_id"]]
 
         corpus.edit_project(LIBRARY_DIR, replace)
         return self.build(corpus)
+
+    def assert_no_receiver(self, index: Path) -> None:
+        result = self.evaluate(index, LIBRARY, SENSOR, TRACK, BFD)
+        for name in ("sensor", "track", "bfd"):
+            self.assertEqual((result[name]["outcome"], result[name].get("reason")), ("UNCONFIRMED", "FACT_MISSING"), name)
+        inspected = self.ok(index, "inspect", LIBRARY)
+        for key in RECEIVER_KEYS:
+            self.assertNotIn(key, inspected["fact_keys"])
 
     def image_pose(self) -> dict[str, Any]:
         return copy.deepcopy(read_json(ROOT / LIBRARY_DIR / "project.json")["observations"][0]["pose"])
@@ -130,7 +158,7 @@ class ImageReceiverRole(CliCase):
         track = {"id": "track", "fact": "first_order.total_track_mm", "op": "gt", "value": 0}
         result = self.evaluate(index, LIBRARY, SENSOR, track)
         for name in ("sensor", "track"):
-            self.assertEqual((result[name]["outcome"], result[name]["reason"]), ("UNCONFIRMED", "FACT_MISSING"), name)
+            self.assertEqual((result[name]["outcome"], result[name].get("reason")), ("UNCONFIRMED", "FACT_MISSING"), name)
         inspected = self.ok(index, "inspect", LIBRARY)
         for key in ("image_format.width_mm", "image_format.height_mm", "first_order.total_track_mm",
                     "first_order.final_powered_vertex_to_sensor_mm"):
@@ -142,6 +170,35 @@ class ImageReceiverRole(CliCase):
         index = self.monitor_corpus("image-side", self.image_pose())
         result = self.evaluate(index, LIBRARY, SENSOR)
         self.assertEqual(result["sensor"]["outcome"], "MATCH")
+
+    def test_monitor_before_a_reversed_source_is_not_the_receiver(self) -> None:
+        # The source sits beyond the lens on its +axis and emits toward -axis, so a plane between
+        # the source and the lens is on the object side even though it is behind the last vertex.
+        reversed_source = {"position_mm": [600.0, 0.0, 0.0], "quaternion_wxyz": FLIPPED_Q}
+        for name, x in (("reversed-source", 261.417804), ("reversed-source-400", 400.0)):
+            pose = {"position_mm": [x, 0.0, 0.0], "quaternion_wxyz": LENS_Q}
+            self.assert_no_receiver(self.monitor_corpus(name, pose, components={"SRC": reversed_source}))
+
+    def test_monitor_before_a_flipped_lens_is_not_the_receiver(self) -> None:
+        # The lens faces -x; the source at -100 still emits toward +x, so the plane at -60 is hit
+        # before the lens although it lies behind the last vertex on the lens's local +Z.
+        pose = {"position_mm": [-60.0, 0.0, 0.0], "quaternion_wxyz": FLIPPED_Q}
+        lens = {"position_mm": [0.0, 0.0, 0.0], "quaternion_wxyz": FLIPPED_Q}
+        self.assert_no_receiver(self.monitor_corpus("reversed-lens", pose, components={"LENS": lens}))
+
+    def test_attached_plane_is_placed_in_its_component_frame(self) -> None:
+        # Attached to LENS or SRC, local pose [261.4, 0, 0] is design pose [0, 261.4, 0] (or
+        # [-100, 261.4, 0]) facing +y: off the lens axis, so not the image receiver.
+        local = {"position_mm": [261.417804, 0.0, 0.0], "quaternion_wxyz": LENS_Q}
+        for device in ("LENS", "SRC"):
+            self.assert_no_receiver(self.monitor_corpus(f"attached-{device}", local, device=device))
+        # The converse: the true image plane expressed in the lens frame is the receiver.
+        lens_local = {"position_mm": [0.0, 0.0, 261.417804], "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]}
+        result = self.evaluate(self.monitor_corpus("attached-lens-local", lens_local, device="LENS"),
+                               LIBRARY, SENSOR, TRACK, BFD)
+        self.assertEqual({name: entry["outcome"] for name, entry in result.items()},
+                         {"sensor": "MATCH", "track": "MATCH", "bfd": "MATCH"})
+        self.assertAlmostEqual(result["track"]["fact"]["value"], 261.417804)
 
     def test_p2b_receiver_is_unchanged(self) -> None:
         corpus = ScratchCorpus(self.work, "p2b")
@@ -169,11 +226,33 @@ class SourceMarkedValues(CliCase):
             entry["review_mtf_basis"] = "contributor estimate"
             entry["model_mtf"] = 0.72
             entry["model_mtf_basis"] = "ENGINE_COMPUTED"
-            gate = record["analysis_evidence"]["tolerance"]["mtf_gate"]
+            # `_from_<word>` value names pair with the marker of their stem.
+            entry["vendor_mtf_from_datasheet"] = 0.91
+            entry["vendor_mtf_basis"] = "SOURCE_STATED"
+            # Nested objects whose own basis is not a Project basis, in any spelling.
+            entry["lower"] = {"value": 0.93, "basis": "source_stated"}
+            entry["punct"] = {"value": 0.94, "basis": "SOURCE_STATED; brief"}
+            entry["vendor"] = {"value": 0.95, "basis": "VENDOR_STATED"}
+            entry["derived"] = {"value": 0.96, "basis": "DERIVED"}
+            efl = record["first_order"]["effective_focal_length_mm"]
+            efl["catalog_mm_from_datasheet"] = 18
+            efl["catalog_basis"] = "SOURCE_STATED"
+            tolerance = record["analysis_evidence"]["tolerance"]
+            tolerance["catalog_yield_fraction_from_vendor"] = 0.97
+            tolerance["catalog_yield_fraction_basis"] = "SOURCE_STATED"
+            gate = tolerance["mtf_gate"]
             gate["reference_passed"] = 96
             gate["reference_passed_basis"] = "SOURCE_STATED"
+            record["analysis_evidence"]["vendor_yield"] = {"status": "measured", "basis": "VENDOR_STATED",
+                                                           "yield_fraction": 0.99}
+
+        def price(record: dict[str, Any]) -> None:
+            record["cost_proxy"] = {"basis": "PROJECT_DERIVED", "weighted_spherical_element_count": 4,
+                                    "spherical_element_weight": 1, "aspheric_element_weight": 3,
+                                    "vendor_price_usd_from_catalog": 120, "vendor_price_usd_basis": "SOURCE_STATED"}
 
         corpus.edit_record(P2B_DIR, mark)
+        corpus.edit_record(LIBRARY_DIR, price)
         cls.index = SourceMarkedValues.build(cls(), corpus)
 
     def full_form(self, cid: str, path: str, op: str, value: Any) -> dict[str, Any]:
@@ -196,6 +275,32 @@ class SourceMarkedValues(CliCase):
             entry = result[constraint["id"]]
             self.assertEqual((entry["outcome"], entry["reason"]), ("UNCONFIRMED", "VALUE_MISSING"), constraint["id"])
 
+    def test_from_suffixed_and_nested_source_values_cannot_match(self) -> None:
+        constraints = [
+            self.full_form("from", "vendor_mtf_from_datasheet", "gte", 0.85),
+            self.full_form("lower", "lower.value", "gte", 0.85),
+            self.full_form("punct", "punct.value", "gte", 0.85),
+            self.full_form("vendor", "vendor.value", "gte", 0.85),
+            {"id": "efl", "scope": ["first_order", "effective_focal_length_mm"],
+             "predicates": [{"path": "catalog_mm_from_datasheet", "op": "eq", "value": 18}]},
+            {"id": "yield", "scope": ["analysis_evidence", "tolerance"],
+             "predicates": [{"path": "catalog_yield_fraction_from_vendor", "op": "gte", "value": 0.9}]},
+            {"id": "study", "scope": ["analysis_evidence", "vendor_yield"],
+             "predicates": [{"path": "yield_fraction", "op": "gte", "value": 0.9}]},
+        ]
+        result = self.evaluate(self.index, P2B, *constraints)
+        for constraint in constraints:
+            self.assertEqual(result[constraint["id"]]["outcome"], "UNCONFIRMED", constraint["id"])
+        # A nested object with an admitted basis stays.
+        self.assertEqual(self.evaluate(self.index, P2B, self.full_form("derived", "derived.value", "gte", 0.9))
+                         ["derived"]["outcome"], "MATCH")
+        price = {"id": "price", "fact": "cost_proxy.vendor_price_usd_from_catalog", "op": "lte", "value": 200}
+        self.assertEqual(self.evaluate(self.index, LIBRARY, price)["price"]["outcome"], "UNCONFIRMED")
+        listed = self.ok(self.index, "fields", "--prefix", "cost_proxy.vendor")
+        self.assertNotIn("cost_proxy.vendor_price_usd_from_catalog", listed["fields"])
+        inspected = json.dumps(self.ok(self.index, "inspect", LIBRARY, "--sections", "cost_proxy"))
+        self.assertNotIn("vendor_price", inspected)
+
     def test_project_values_stay_available(self) -> None:
         result = self.evaluate(self.index, P2B, self.full_form("minimum", "value", "gt", 0.7),
                                self.full_form("model", "model_mtf", "gt", 0.7))
@@ -211,7 +316,8 @@ class SourceMarkedValues(CliCase):
         inspected = self.ok(self.index, "inspect", P2B, "--fields", "performance.mtf_field_minimum",
                             "--sections", "performance,analysis_evidence")
         text = json.dumps(inspected)
-        for name in ("reference_mtf", "reference_contrast", "review_mtf", "reference_passed"):
+        for name in ("reference_mtf", "reference_contrast", "review_mtf", "reference_passed", "vendor_mtf",
+                     "catalog_yield", "vendor_yield", "source_stated", "VENDOR_STATED", "0.93", "0.94"):
             self.assertNotIn(name, text)
         self.assertIn('"model_mtf": 0.72', text)
         self.assertIn('"model_mtf_basis": "ENGINE_COMPUTED"', text)

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable
 from typing import Any
 
 from .canonical import is_number
+from .normalize import FROM_SUFFIX, member_stem
 
 PROJECT_BASES = {"PROJECT_DECLARED", "PROJECT_DERIVED", "ENGINE_COMPUTED"}
 DESIGN_CLASSIFICATION = (
@@ -42,31 +44,33 @@ def _pick(obj: Any, *keys: str) -> dict[str, Any]:
     return {key: body[key] for key in keys if key in body}
 
 
+_BASIS_TOKEN = re.compile(r"[A-Za-z_]+")
+
+
 def _basis(value: Any) -> str:
-    return value.split(maxsplit=1)[0] if isinstance(value, str) and value.strip() else ""
+    """The leading basis token (`SOURCE_STATED; brief` -> `SOURCE_STATED`). Admission compares it
+    against exact upper-case allow-lists, so `source_stated` or `VENDOR_STATED` is never admitted."""
+    match = _BASIS_TOKEN.match(value.strip()) if isinstance(value, str) else None
+    return match.group(0) if match else ""
 
-
-UNIT_SUFFIXES = ("_lp_mm", "_percent", "_deg", "_um", "_nm", "_mm")
-"""Unit suffixes a value name may carry beside the stem its `<stem>_basis` marker names."""
 
 ANALYSIS_BASES = {*PROJECT_BASES, "DERIVED"}
-"""Marker bases a value nested in an admitted Project analysis may carry."""
+"""Bases a value or object nested in an admitted Project analysis may carry."""
 
 
-def _marker_stem(key: str) -> str:
-    for suffix in UNIT_SUFFIXES:
-        if key.endswith(suffix) and len(key) > len(suffix):
-            return key[: -len(suffix)]
-    return key
+def _marker_names(key: str) -> tuple[str, ...]:
+    """The names a `<name>_basis` marker may use for value `key`: the key itself, the key without a
+    trailing `_from_<word>`, and its stem without the unit suffix, as `normalize.member_stem` pairs
+    them (`vendor_mtf_basis` marks `vendor_mtf_from_datasheet`, `width_basis` marks `width_mm`)."""
+    return tuple(dict.fromkeys((key, FROM_SUFFIX.sub("", key), member_stem(key))))
 
 
 def _marker(obj: dict[str, Any], key: str) -> tuple[bool, Any]:
-    """The `<name>_basis` marker beside a value: `name` is the value's key or its unit stem
-    (`reference_mtf_basis` marks `reference_mtf`, `width_basis` marks `width_mm`)."""
+    """The `<name>_basis` marker beside a value (see `_marker_names`)."""
     if key.endswith("_basis"):
         return False, None
-    for name in dict.fromkeys((key, _marker_stem(key))):
-        if name + "_basis" in obj:
+    for name in _marker_names(key):
+        if name and name + "_basis" in obj:
             return True, obj[name + "_basis"]
     return False, None
 
@@ -75,8 +79,7 @@ def _pairs_a_value(obj: dict[str, Any], marker: str) -> bool:
     """Whether `<name>_basis` sits beside the value it qualifies. A `*_basis` member with no such
     value, such as the field-coordinate convention `field_basis`, is an ordinary member."""
     name = marker[: -len("_basis")]
-    return any(key != marker and not key.endswith("_basis") and (key == name or _marker_stem(key) == name)
-               for key in obj)
+    return any(key != marker and not key.endswith("_basis") and name in _marker_names(key) for key in obj)
 
 
 def _dropped_marker(obj: dict[str, Any], key: str, admitted: set[str]) -> bool:
@@ -104,9 +107,12 @@ def analysis_applies(document: dict[str, Any], project_sha: str | None, configur
 
 
 def _applicable(item: Any, applies: Callable[[dict[str, Any]], bool]) -> bool:
+    """A nested object (or an `analysis_evidence` study) is kept when it states no basis, so it is
+    part of the analysis that holds it, or states a basis in `ANALYSIS_BASES`; any other basis
+    (SOURCE_STATED in any spelling, a vendor or contributor basis) removes it."""
     obj = _object(item)
     ref = obj.get("source")
-    return (_basis(obj.get("basis")) != "SOURCE_STATED"
+    return ((obj.get("basis") is None or _basis(obj["basis"]) in ANALYSIS_BASES)
             and (not isinstance(ref, dict) or applies(ref)))
 
 
@@ -183,6 +189,74 @@ def _position(pose: Any) -> list[float] | None:
     return None
 
 
+def _same_axis(a: tuple[float, float, float] | None, b: tuple[float, float, float] | None) -> bool:
+    return a is not None and b is not None and all(abs(x - y) <= 1e-9 for x, y in zip(a, b))
+
+
+def _dot(a: Any, b: Any) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _compose(parent: dict[str, Any], local: dict[str, Any]) -> dict[str, Any] | None:
+    """The design-frame pose of `local` given in the frame of `parent`: position p + R(q)·p_local,
+    orientation q ⊗ q_local (ObservationV1 with `device_instance_id`)."""
+    p, pl = _position(parent), _position(local)
+    q, ql = parent.get("quaternion_wxyz"), local.get("quaternion_wxyz")
+    if p is None or pl is None or _axis(parent) is None or _axis(local) is None:
+        return None
+    w, x, y, z = q
+    a, b, c, d = ql
+
+    def cross(u: Any, v: Any) -> list[float]:
+        return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+
+    u = [x, y, z]
+    t = [2 * value for value in cross(u, pl)]
+    rotated = [v + w * tv + cv for v, tv, cv in zip(pl, t, cross(u, t))]
+    return {
+        "position_mm": [origin + offset for origin, offset in zip(p, rotated)],
+        "quaternion_wxyz": [w * a - x * b - y * c - z * d, w * b + x * a + y * d - z * c,
+                            w * c - x * d + y * a + z * b, w * d + x * c - y * b + z * a],
+    }
+
+
+def _observation_pose(project: dict[str, Any], observation: dict[str, Any]) -> dict[str, Any] | None:
+    """The observation's design-frame pose; an attached plane's pose is in its component's frame."""
+    pose = _object(observation.get("pose"))
+    device = observation.get("device_instance_id")
+    if device is None:
+        return pose
+    hosts = [c for c in _objects(project.get("components")) if c.get("instance_id") == device]
+    return _compose(_object(hosts[0].get("nominal_pose")), pose) if len(hosts) == 1 else None
+
+
+def _light_enters_first_vertex(project: dict[str, Any], model: dict[str, Any], origin: list[float],
+                               axis: tuple[float, float, float], first_vertex: float) -> bool:
+    """Whether the configuration's light travels along the lens's +axis: every source lies before the
+    first vertex on that axis and emits toward +axis, and the lens ports (when present) face +axis.
+    Only then is an observation behind the last vertex on the image side."""
+    for port in _objects(model.get("ports")):
+        direction = port.get("direction")
+        if port.get("role") in ("INPUT", "OUTPUT"):
+            if not isinstance(direction, list) or len(direction) != 3:
+                return False
+            z = _number(direction[2])
+            if z is None or z <= 0:
+                return False
+    sources = [c for c in _objects(project.get("components"))
+               if c.get("optical_role") == "source" or "source_model" in c]
+    if not sources:
+        return False
+    for source in sources:
+        pose = _object(source.get("nominal_pose"))
+        position, direction = _position(pose), _axis(pose)
+        if position is None or direction is None or _dot(direction, axis) <= 0:
+            return False
+        if _dot(axis, [b - a for a, b in zip(origin, position)]) >= first_vertex:
+            return False
+    return True
+
+
 def _models(project: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {m["model_id"]: _object(m.get("model")) for m in _objects(project.get("optical_models"))
             if isinstance(m.get("model_id"), str)}
@@ -223,9 +297,11 @@ def _native_geometry(project: dict[str, Any], view: dict[str, Any]) -> None:
     if len(observations) != 1:
         return
     observation = observations[0]
-    pose, image_pose = _object(lens.get("nominal_pose")), _object(observation.get("pose"))
+    pose, image_pose = _object(lens.get("nominal_pose")), _observation_pose(project, observation)
+    if image_pose is None:
+        return
     axis, origin, image = _axis(pose), _position(pose), _position(image_pose)
-    if axis is None or origin is None or image is None or axis != _axis(image_pose):
+    if axis is None or origin is None or image is None or not _same_axis(axis, _axis(image_pose)):
         return
     offset = [b - a for a, b in zip(origin, image)]
     image_z = sum(a * b for a, b in zip(axis, offset))
@@ -250,9 +326,10 @@ def _native_geometry(project: dict[str, Any], view: dict[str, Any]) -> None:
         media = model.get("media")
         if len(zs) == 2 and not any(powered) and isinstance(media, list) and len(media) == 1 and isinstance(media[0], str):
             plates.append((offset_z + zs[0], media[0], zs[1] - zs[0]))
-    if not vertices or image_z < max(z for z, _ in vertices):
-        # Not behind the last optical surface on the lens axis: the observation is not an image
-        # receiver of this configuration, so it supplies no image-format or back-focus fact.
+    if (not vertices or image_z < max(z for z, _ in vertices)
+            or not _light_enters_first_vertex(project, model, origin, axis, min(z for z, _ in vertices))):
+        # Not behind the last optical surface in the direction the configuration's light travels:
+        # the observation is not an image receiver, so it supplies no image-format or back-focus fact.
         return
     receiver = _object(observation.get("aperture"))
     if receiver.get("shape") == "rectangle":
