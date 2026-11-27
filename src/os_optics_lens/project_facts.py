@@ -46,6 +46,55 @@ def _basis(value: Any) -> str:
     return value.split(maxsplit=1)[0] if isinstance(value, str) and value.strip() else ""
 
 
+UNIT_SUFFIXES = ("_lp_mm", "_percent", "_deg", "_um", "_nm", "_mm")
+"""Unit suffixes a value name may carry beside the stem its `<stem>_basis` marker names."""
+
+ANALYSIS_BASES = {*PROJECT_BASES, "DERIVED"}
+"""Marker bases a value nested in an admitted Project analysis may carry."""
+
+
+def _marker_stem(key: str) -> str:
+    for suffix in UNIT_SUFFIXES:
+        if key.endswith(suffix) and len(key) > len(suffix):
+            return key[: -len(suffix)]
+    return key
+
+
+def _marker(obj: dict[str, Any], key: str) -> tuple[bool, Any]:
+    """The `<name>_basis` marker beside a value: `name` is the value's key or its unit stem
+    (`reference_mtf_basis` marks `reference_mtf`, `width_basis` marks `width_mm`)."""
+    if key.endswith("_basis"):
+        return False, None
+    for name in dict.fromkeys((key, _marker_stem(key))):
+        if name + "_basis" in obj:
+            return True, obj[name + "_basis"]
+    return False, None
+
+
+def _pairs_a_value(obj: dict[str, Any], marker: str) -> bool:
+    """Whether `<name>_basis` sits beside the value it qualifies. A `*_basis` member with no such
+    value, such as the field-coordinate convention `field_basis`, is an ordinary member."""
+    name = marker[: -len("_basis")]
+    return any(key != marker and not key.endswith("_basis") and (key == name or _marker_stem(key) == name)
+               for key in obj)
+
+
+def _dropped_marker(obj: dict[str, Any], key: str, admitted: set[str]) -> bool:
+    """A `*_basis` member leaves the projection when it states SOURCE_STATED, or when it qualifies a
+    sibling value with a basis outside `admitted` (it leaves together with that value)."""
+    if not key.endswith("_basis"):
+        return False
+    basis = _basis(obj[key])
+    return basis == "SOURCE_STATED" or (basis not in admitted and _pairs_a_value(obj, key))
+
+
+def _marked_outside(obj: dict[str, Any], key: str, admitted: set[str]) -> bool:
+    """Whether a value is paired with a marker whose basis is not admitted, so the value is a
+    source-stated or unclassified quantity and the value/marker pair leaves the projection."""
+    present, marker = _marker(obj, key)
+    return present and _basis(marker) not in admitted
+
+
 def analysis_applies(document: dict[str, Any], project_sha: str | None, configuration_id: str | None,
                      revision: int) -> bool:
     """Check the applicability bindings an evidence extract declares."""
@@ -69,13 +118,15 @@ def _clean(value: Any, applies: Callable[[dict[str, Any]], bool]) -> Any:
         return value
     clean: dict[str, Any] = {}
     for key, item in value.items():
+        if _marked_outside(value, key, ANALYSIS_BASES):
+            continue
         if key == "source":
             if isinstance(item, dict):
                 clean[key] = {k: item.get(k) if isinstance(item.get(k), str) else None
                               for k in ("path", "sha256", "section")}
         elif (key not in CHECK_MEMBERS and not key.startswith(("source_", "stated_", "printed_"))
               and not key.endswith(("_source", "_comparison", "_from_dump", "_air_nm"))
-              and not (key.endswith("_basis") and _basis(item) == "SOURCE_STATED")
+              and not _dropped_marker(value, key, ANALYSIS_BASES)
               and _applicable(item, applies)):
             clean[key] = _clean(item, applies)
     return clean
@@ -97,8 +148,8 @@ def _fact_section(section: dict[str, Any], applies: Callable[[dict[str, Any]], b
         if isinstance(original, dict) and "basis" in original:
             eligible = _analysis_supported(original, applies, legacy_analysis)
         else:
-            sibling_basis = section.get(key.removesuffix("_mm") + "_basis")
-            eligible = (_basis(sibling_basis) in PROJECT_BASES if sibling_basis is not None else whole)
+            marked, sibling_basis = _marker(section, key)
+            eligible = _basis(sibling_basis) in PROJECT_BASES if marked else whole
         if eligible:
             facts[key] = value
     return facts
@@ -172,11 +223,6 @@ def _native_geometry(project: dict[str, Any], view: dict[str, Any]) -> None:
     if len(observations) != 1:
         return
     observation = observations[0]
-    receiver = _object(observation.get("aperture"))
-    if receiver.get("shape") == "rectangle":
-        width, height = (_number(receiver.get(k)) for k in ("half_width_mm", "half_height_mm"))
-        if width is not None and height is not None and width > 0 and height > 0:
-            view.setdefault("image_format", {}).update(width_mm=2 * width, height_mm=2 * height)
     pose, image_pose = _object(lens.get("nominal_pose")), _object(observation.get("pose"))
     axis, origin, image = _axis(pose), _position(pose), _position(image_pose)
     if axis is None or origin is None or image is None or axis != _axis(image_pose):
@@ -205,7 +251,14 @@ def _native_geometry(project: dict[str, Any], view: dict[str, Any]) -> None:
         if len(zs) == 2 and not any(powered) and isinstance(media, list) and len(media) == 1 and isinstance(media[0], str):
             plates.append((offset_z + zs[0], media[0], zs[1] - zs[0]))
     if not vertices or image_z < max(z for z, _ in vertices):
+        # Not behind the last optical surface on the lens axis: the observation is not an image
+        # receiver of this configuration, so it supplies no image-format or back-focus fact.
         return
+    receiver = _object(observation.get("aperture"))
+    if receiver.get("shape") == "rectangle":
+        width, height = (_number(receiver.get(k)) for k in ("half_width_mm", "half_height_mm"))
+        if width is not None and height is not None and width > 0 and height > 0:
+            view.setdefault("image_format", {}).update(width_mm=2 * width, height_mm=2 * height)
     order = view.setdefault("first_order", {})
     order["total_track_mm"] = {
         "value": image_z - min(z for z, _ in vertices), "basis": "PROJECT_DERIVED",
