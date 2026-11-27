@@ -64,7 +64,7 @@ shows the state per record.
   The `band` facet and the `filters.spectral_span` filter use it. It never satisfies a hard
   constraint (UNCONFIRMED `DISCOVERY_ONLY`).
 * `spectrum.continuous_coverage_nm` is established coverage. `covers_interval [a, b]` matches
-  only when its state is CONFIRMED or SOURCE_STATED and it contains [a, b]; otherwise
+  only when its state is CONFIRMED and it contains [a, b] (a source-stated coverage never confirms it); otherwise
   UNCONFIRMED `COVERAGE_UNCONFIRMED` (details show the sampling span).
 * Sampled wavelengths: `spectrum.sampling_wavelengths_nm` with `includes_all` or `eq`; spectral
   weights with `proportional_weights` (same ordered wavelengths, weights compared by ratio).

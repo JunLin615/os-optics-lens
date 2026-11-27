@@ -55,7 +55,31 @@ def _basis(value: Any) -> str:
 
 
 ANALYSIS_BASES = {*PROJECT_BASES, "DERIVED"}
-"""Bases a value or object nested in an admitted Project analysis may carry."""
+"""Bases a value or object nested in an admitted legacy camera analysis may carry; elsewhere only
+`PROJECT_BASES` are admitted, as at section level."""
+
+CONVENTION_MEMBERS = frozenset({"field_basis", "scale_basis"})
+"""Documented `*_basis` members that state a coordinate or scale convention, never a value's basis."""
+
+_BASIS_CLASS = re.compile(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*")
+
+
+def _class_marker(marker_value: Any) -> bool:
+    """Whether a marker states a basis class (`SOURCE_STATED`, `VENDOR_STATED`, `DERIVED`, ...)."""
+    return isinstance(marker_value, str) and _BASIS_CLASS.fullmatch(_basis(marker_value)) is not None
+
+
+def _qualifies(marker: str, marker_value: Any, key: str) -> bool:
+    """Whether `marker` (`<name>_basis`) qualifies the sibling value `key`. A marker stating a basis
+    class qualifies `name` and any `name_...` member, ignoring case (`quoted_mtf_basis` marks
+    `quoted_mtf_ratio` and `Quoted_MTF`); a prose marker qualifies the names `_marker_names` gives."""
+    if marker in CONVENTION_MEMBERS or key == marker or key.endswith("_basis"):
+        return False
+    name = marker[: -len("_basis")]
+    if name in _marker_names(key):
+        return True
+    lowered, stem = key.lower(), name.lower()
+    return _class_marker(marker_value) and (lowered == stem or lowered.startswith(stem + "_"))
 
 
 def _marker_names(key: str) -> tuple[str, ...]:
@@ -66,20 +90,17 @@ def _marker_names(key: str) -> tuple[str, ...]:
 
 
 def _marker(obj: dict[str, Any], key: str) -> tuple[bool, Any]:
-    """The `<name>_basis` marker beside a value (see `_marker_names`)."""
-    if key.endswith("_basis"):
+    """The `<name>_basis` marker beside a value (see `_qualifies`); the most specific name wins."""
+    markers = [m for m in obj if isinstance(m, str) and m.endswith("_basis") and _qualifies(m, obj[m], key)]
+    if not markers:
         return False, None
-    for name in _marker_names(key):
-        if name and name + "_basis" in obj:
-            return True, obj[name + "_basis"]
-    return False, None
+    return True, obj[max(markers, key=len)]
 
 
 def _pairs_a_value(obj: dict[str, Any], marker: str) -> bool:
-    """Whether `<name>_basis` sits beside the value it qualifies. A `*_basis` member with no such
-    value, such as the field-coordinate convention `field_basis`, is an ordinary member."""
-    name = marker[: -len("_basis")]
-    return any(key != marker and not key.endswith("_basis") and name in _marker_names(key) for key in obj)
+    """Whether `<name>_basis` sits beside a value it qualifies. A `*_basis` member with no such
+    value, or a documented convention such as `field_basis`, is an ordinary member."""
+    return any(isinstance(key, str) and _qualifies(marker, obj[marker], key) for key in obj)
 
 
 def _dropped_marker(obj: dict[str, Any], key: str, admitted: set[str]) -> bool:
@@ -106,25 +127,28 @@ def analysis_applies(document: dict[str, Any], project_sha: str | None, configur
             and document.get("record_revision", revision) == revision)
 
 
-def _applicable(item: Any, applies: Callable[[dict[str, Any]], bool]) -> bool:
+def _applicable(item: Any, applies: Callable[[dict[str, Any]], bool],
+                admitted: set[str] = ANALYSIS_BASES) -> bool:
     """A nested object (or an `analysis_evidence` study) is kept when it states no basis, so it is
     part of the analysis that holds it, or states a basis in `ANALYSIS_BASES`; any other basis
     (SOURCE_STATED in any spelling, a vendor or contributor basis) removes it."""
     obj = _object(item)
     ref = obj.get("source")
-    return ((obj.get("basis") is None or _basis(obj["basis"]) in ANALYSIS_BASES)
+    return ((obj.get("basis") is None or _basis(obj["basis"]) in admitted)
             and (not isinstance(ref, dict) or applies(ref)))
 
 
-def _clean(value: Any, applies: Callable[[dict[str, Any]], bool]) -> Any:
-    """Copy a Project analysis, dropping review members and keeping typed calculation references."""
+def _clean(value: Any, applies: Callable[[dict[str, Any]], bool],
+           admitted: set[str] = ANALYSIS_BASES) -> Any:
+    """Copy a Project analysis, dropping review members and keeping typed calculation references.
+    `admitted` is the set of bases a nested object or a value marker may state."""
     if isinstance(value, list):
-        return [_clean(item, applies) for item in value if _applicable(item, applies)]
+        return [_clean(item, applies, admitted) for item in value if _applicable(item, applies, admitted)]
     if not isinstance(value, dict):
         return value
     clean: dict[str, Any] = {}
     for key, item in value.items():
-        if _marked_outside(value, key, ANALYSIS_BASES):
+        if _marked_outside(value, key, admitted):
             continue
         if key == "source":
             if isinstance(item, dict):
@@ -132,9 +156,9 @@ def _clean(value: Any, applies: Callable[[dict[str, Any]], bool]) -> Any:
                               for k in ("path", "sha256", "section")}
         elif (key not in CHECK_MEMBERS and not key.startswith(("source_", "stated_", "printed_"))
               and not key.endswith(("_source", "_comparison", "_from_dump", "_air_nm"))
-              and not _dropped_marker(value, key, ANALYSIS_BASES)
-              and _applicable(item, applies)):
-            clean[key] = _clean(item, applies)
+              and not _dropped_marker(value, key, admitted)
+              and _applicable(item, applies, admitted)):
+            clean[key] = _clean(item, applies, admitted)
     return clean
 
 
@@ -145,11 +169,11 @@ def _analysis_supported(item: Any, applies: Callable[[dict[str, Any]], bool], le
 
 
 def _fact_section(section: dict[str, Any], applies: Callable[[dict[str, Any]], bool], *,
-                  legacy_analysis: bool = False) -> dict[str, Any]:
+                  legacy_analysis: bool = False, admitted: set[str] = PROJECT_BASES) -> dict[str, Any]:
     """Admit explicitly Project-based facts and recognized legacy analyses."""
     whole = _analysis_supported(section, applies, legacy_analysis)
     facts = {}
-    for key, value in _clean(section, applies).items():
+    for key, value in _clean(section, applies, admitted).items():
         original = section[key]
         if isinstance(original, dict) and "basis" in original:
             eligible = _analysis_supported(original, applies, legacy_analysis)
@@ -332,7 +356,11 @@ def _native_geometry(project: dict[str, Any], view: dict[str, Any]) -> None:
         # the observation is not an image receiver, so it supplies no image-format or back-focus fact.
         return
     receiver = _object(observation.get("aperture"))
-    if receiver.get("shape") == "rectangle":
+    offset = receiver.get("center_offset_mm", [0, 0])
+    centred = (isinstance(offset, list) and len(offset) == 2
+               and all(_number(v) is not None and abs(_number(v)) <= 1e-9 for v in offset))
+    if receiver.get("shape") == "rectangle" and centred:
+        # width_mm and height_mm are the receiver's own u and v extents (its local x and y).
         width, height = (_number(receiver.get(k)) for k in ("half_width_mm", "half_height_mm"))
         if width is not None and height is not None and width > 0 and height > 0:
             view.setdefault("image_format", {}).update(width_mm=2 * width, height_mm=2 * height)
@@ -403,25 +431,27 @@ def project_view(record: dict[str, Any], project: Any, *, as_written: bool,
         validity, "state", "stop_blocks_light", "eligible_for_stop_dependent_evaluation",
     )
     legacy_camera = as_written and camera_evidence and collection in CAMERA_COLLECTIONS
+    nested = ANALYSIS_BASES if legacy_camera else PROJECT_BASES
     for name in ("first_order", "aperture", "field", "image_format", "spectrum", "cost_proxy"):
         section = _object(record.get(name))
         if name == "cost_proxy" and legacy_camera:
             section = _pick(section, "basis", "scope", "weighted_spherical_element_count", "spherical_element_weight",
                             "aspheric_element_weight", "source")
-        section = _fact_section(section, applies, legacy_analysis=legacy_camera and name == "cost_proxy")
+        section = _fact_section(section, applies, legacy_analysis=legacy_camera and name == "cost_proxy",
+                                admitted=nested)
         if section:
             view[name] = section
     formats = _pick(record.get("image_format"), "format_facets")
     if formats:
         view.setdefault("image_format", {}).update(formats)
     legacy_metrics = ("mtf", "mtf_field_minimum", "distortion_range")
-    performance = [_clean(item, applies) for item in _objects(record.get("performance"))
+    performance = [_clean(item, applies, nested) for item in _objects(record.get("performance"))
                    if _analysis_supported(item, applies, legacy_camera and item.get("metric") in legacy_metrics)]
     if performance:
         view["performance"] = performance
     studies = _object(record.get("analysis_evidence"))
     if studies:
-        view["analysis_evidence"] = _clean(studies, applies)
+        view["analysis_evidence"] = _clean(studies, applies, nested)
 
     check = _object(_object(record.get("first_order")).get("engine_check"))
     wavelength = check.get("wavelength_nm") if check.get("basis") == "ENGINE_COMPUTED" else None

@@ -323,5 +323,78 @@ class SourceMarkedValues(CliCase):
         self.assertIn('"model_mtf_basis": "ENGINE_COMPUTED"', text)
 
 
+class ProjectionEdges(CliCase):
+    """Second review pass: off-axis active areas, marker gating, nested bases and coverage."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        work = tempfile.TemporaryDirectory(prefix="os-optics-lens-edges-")
+        cls.addClassCleanup(work.cleanup)
+        cls.work = Path(work.name)
+
+    def test_off_axis_active_area_supplies_no_width_or_height(self) -> None:
+        corpus = ScratchCorpus(self.work, "offset")
+
+        def offset(project: dict[str, Any]) -> None:
+            observation = project["observations"][0]
+            observation["aperture"] = dict(MONITOR_APERTURE, center_offset_mm=[30, 0])
+
+        corpus.edit_project(LIBRARY_DIR, offset)
+        index = self.build(corpus)
+        result = self.evaluate(index, LIBRARY, SENSOR, TRACK)
+        self.assertEqual((result["sensor"]["outcome"], result["sensor"]["reason"]), ("UNCONFIRMED", "FACT_MISSING"))
+        self.assertEqual(result["track"]["outcome"], "MATCH")
+
+    def test_marker_gating_nested_bases_and_coverage(self) -> None:
+        corpus = ScratchCorpus(self.work, "edges")
+
+        def p2b(record: dict[str, Any]) -> None:
+            entry = next(item for item in record["performance"] if item["metric"] == "mtf_field_minimum")
+            # A field-coordinate convention beside a real Project field angle keeps both.
+            entry["conditions"]["field_deg"] = 49.5
+            # Basis-class markers pair with any `name_...` member and ignore case.
+            entry["quoted_mtf_ratio"] = 0.91
+            entry["quoted_mtf_basis"] = "SOURCE_STATED"
+            entry["Upper_MTF"] = 0.92
+            entry["upper_mtf_basis"] = "VENDOR_STATED"
+            # A legacy camera analysis keeps a DERIVED pair.
+            entry["derived_mtf"] = 0.72
+            entry["derived_mtf_basis"] = "DERIVED"
+            record["spectrum"]["continuous_coverage_nm"] = {"state": "SOURCE_STATED", "min_nm": 400, "max_nm": 700,
+                                                            "basis": "ENGINE_COMPUTED"}
+
+        def library(record: dict[str, Any]) -> None:
+            # Outside the legacy camera analyses a nested DERIVED value is not a Project fact.
+            record["performance"] = [{"metric": "mtf_field_minimum", "basis": "ENGINE_COMPUTED", "value": 0.5,
+                                      "derived_mtf": 0.9, "derived_mtf_basis": "DERIVED from the brief"}]
+
+        corpus.edit_record(P2B_DIR, p2b)
+        corpus.edit_record(LIBRARY_DIR, library)
+        index = self.build(corpus)
+
+        def entry_path(cid: str, path: str, op: str, value: Any) -> dict[str, Any]:
+            return {"id": cid, "scope": ["performance"], "metric": "mtf_field_minimum",
+                    "predicates": [{"path": path, "op": op, "value": value}]}
+
+        result = self.evaluate(
+            index, P2B,
+            dict(entry_path("convention", "value", "gt", 0.7),
+                 conditions={"field_basis": "diagonal_image_height_fraction", "field_deg": 49.5}),
+            entry_path("quoted", "quoted_mtf_ratio", "gte", 0.9),
+            entry_path("upper", "Upper_MTF", "gte", 0.9),
+            entry_path("derived", "derived_mtf", "gt", 0.7),
+            {"id": "coverage", "fact": "spectrum.continuous_coverage_nm", "op": "covers_interval",
+             "value": [450, 650]},
+        )
+        self.assertEqual(result["convention"]["outcome"], "MATCH")
+        for name in ("quoted", "upper"):
+            self.assertEqual((result[name]["outcome"], result[name]["reason"]), ("UNCONFIRMED", "VALUE_MISSING"), name)
+        self.assertEqual(result["derived"]["outcome"], "MATCH")
+        self.assertEqual(result["coverage"]["outcome"], "UNCONFIRMED")
+
+        result = self.evaluate(index, LIBRARY, entry_path("nested", "derived_mtf", "gte", 0.85))
+        self.assertEqual((result["nested"]["outcome"], result["nested"]["reason"]), ("UNCONFIRMED", "VALUE_MISSING"))
+
+
 if __name__ == "__main__":
     unittest.main()

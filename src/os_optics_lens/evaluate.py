@@ -113,7 +113,7 @@ EVIDENCE_STATUSES = frozenset({
 
 _DISCOVERY_MARK = "DISCOVERY_ONLY"
 _COVERAGE_KEY = ("spectrum", "continuous_coverage_nm")
-_CONFIRMED_COVERAGE_STATES = frozenset({"CONFIRMED", "SOURCE_STATED"})
+_CONFIRMED_COVERAGE_STATES = frozenset({"CONFIRMED"})
 _VALUE_MEMBER = re.compile(r"^value(_[a-z_]+)?$")
 _FACT_SYNTAX = re.compile(r"^[^.\s]+(\.[^.\s]+)*$")
 _NOT_FACTS = frozenset({

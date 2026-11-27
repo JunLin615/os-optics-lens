@@ -323,6 +323,15 @@ preferences: [ranking_preference], evaluation_scope, detail: full}`. The Yutong 
 constraint checks geometric coverage. The native P2b Project uses a continuous receiver, so a
 separate constraint for the competition brief's pixel pitch is `UNCONFIRMED`.
 
+Image-format, total-track and vertex-to-sensor facts come only from the configuration's image
+receiver: the single observation on the lens axis behind the last optical surface, in the
+direction the Project's sources send light. An observation attached to a component is placed in
+that component's frame. `width_mm` and `height_mm` are the receiver's own u and v extents, and are
+derived only when the rectangle is centred on the axis. A Project without such a receiver leaves
+these constraints `UNCONFIRMED`. A value paired with a `<name>_basis` marker that is not a Project
+basis leaves the projection with its marker at any depth; `field_basis` and `scale_basis` are
+conventions, not markers.
+
 ### Batch
 
 ```json
@@ -545,7 +554,7 @@ conditions and evidence requirements. Targets and preferences use the same eligi
   the `spectral_span` filter use it, and it is marked `DISCOVERY_ONLY`. A hard constraint on it,
   in any form, is UNCONFIRMED `DISCOVERY_ONLY`.
 - `spectrum.continuous_coverage_nm` is established coverage. `covers_interval [a, b]` matches
-  only when its state is CONFIRMED or SOURCE_STATED and it contains [a, b]. Otherwise the result
+  only when its state is CONFIRMED and it contains [a, b]; a source-stated coverage never confirms it. Otherwise the result
   is `COVERAGE_UNCONFIRMED`, with the sampling span shown for information.
 - Sampled wavelengths are compared with `includes_all`/`eq` on `spectrum.sampling_wavelengths_nm`.
   Spectral weights are compared with `proportional_weights`.

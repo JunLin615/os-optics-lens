@@ -1647,7 +1647,7 @@ def _example(s: _Session, key: str, rows: list[dict[str, Any]],
             lo, hi = row["value_min"], row["value_max"]
             example.update({"op": "covers_interval",
                             "value": [lo, hi] if lo is not None and hi is not None else [450, 650]})
-            if row["state"] is not None and row["state"] not in ("CONFIRMED", "SOURCE_STATED"):
+            if row["state"] is not None and row["state"] not in ("CONFIRMED",):
                 note = (f"state {row['state']}: covers_interval is UNCONFIRMED (COVERAGE_UNCONFIRMED) until "
                         "the coverage is confirmed")
     elif kind == "none":
