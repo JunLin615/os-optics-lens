@@ -1,0 +1,139 @@
+{
+  "schema": "opensci.lens.record",
+  "record_schema_version": "1.1",
+  "record_id": "refractor-1000-f08-baseline",
+  "record_revision": 1,
+  "title": "One-metre f/0.8 four-element refractor, baseline prescription",
+  "collection": {
+    "collection_id": "opensci-design-studies",
+    "source": "OpenSci reader-request optical design studies",
+    "source_input": "07_telescope_1000mm_f08/prescription.csv",
+    "source_input_sha256": "2d2972a9eb8b90483a6dc2476945f938f58911f9987c95ec083529b85be92d95",
+    "attribution": "One-metre f/0.8 four-element refractor, baseline prescription; numerical design study by OpenSci.",
+    "contributor": "JunLin615",
+    "redistribution": "Native design study contributed under the repository MIT License.",
+    "license": {
+      "spdx": "MIT",
+      "notice_path": "LICENSE",
+      "copyright": "Copyright (c) 2026 JunLin615"
+    }
+  },
+  "design": {
+    "design_scope": "COMPLETE_SYSTEM",
+    "lens_type": "telescope",
+    "design_family_id": "refractor-1000-f08",
+    "function_tags": [
+      "imaging"
+    ],
+    "application_tags": [
+      "astronomy"
+    ],
+    "structure_tags": [
+      "refractive",
+      "fixed_focal_length"
+    ],
+    "configuration_count": 2,
+    "powered_element_count": 4,
+    "powered_group_count": 4
+  },
+  "native_project": {
+    "path": "records/opensci-design-studies/refractor-1000-f08-baseline/project.json",
+    "sha256": "b5f2fa600a1cd2b4c3c36e09a5e6622fd544362e5b9927c0d0d4e77f2a21a29a",
+    "engine_version": "0.14.0",
+    "opening_outcome": "ACCEPTED",
+    "instance_id": "Objective",
+    "model_id": "Objective"
+  },
+  "configurations": [
+    {
+      "configuration_id": "Infinity",
+      "label": "Infinity",
+      "conjugate": "INFINITE_TO_FINITE",
+      "first_order": {
+        "effective_focal_length_mm": {
+          "value": 800.0000307737865,
+          "basis": "ENGINE_COMPUTED",
+          "conditions": {
+            "wavelength_nm": 587.7218659920181
+          },
+          "definition": "Native paraxial effective focal length."
+        }
+      },
+      "aperture": {
+        "nominal_f_number": {
+          "value": 0.8,
+          "basis": "SOURCE_STATED",
+          "definition": "Nominal design iris setting at infinity.",
+          "system_aperture": true
+        },
+        "entrance_pupil_f_number": {
+          "value": 0.8000000307737866,
+          "basis": "PROJECT_DERIVED",
+          "conditions": {
+            "method": "axial_paraxial_clear_apertures",
+            "convention": "efl_over_admitted_entrance_pupil_diameter",
+            "conjugate": "infinite_to_finite",
+            "field": "on_axis",
+            "wavelength_nm": 587.7218659920181
+          },
+          "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+          "system_aperture": true
+        }
+      }
+    },
+    {
+      "configuration_id": "Halpha",
+      "label": "Refocused C line (H-alpha proxy)",
+      "conjugate": "INFINITE_TO_FINITE",
+      "first_order": {
+        "effective_focal_length_mm": {
+          "value": 801.3226359783122,
+          "basis": "ENGINE_COMPUTED",
+          "conditions": {
+            "wavelength_nm": 656.4506882512153
+          },
+          "definition": "Native paraxial effective focal length."
+        }
+      },
+      "aperture": {
+        "entrance_pupil_f_number": {
+          "value": 0.8013226359783123,
+          "basis": "PROJECT_DERIVED",
+          "conditions": {
+            "method": "axial_paraxial_clear_apertures",
+            "convention": "efl_over_admitted_entrance_pupil_diameter",
+            "conjugate": "infinite_to_finite",
+            "field": "on_axis",
+            "wavelength_nm": 656.4506882512153
+          },
+          "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+          "system_aperture": true
+        }
+      },
+      "spectrum": {
+        "primary_wavelength_nm": 656.4506882512153,
+        "sampling_wavelengths_nm": [
+          656.4506882512153
+        ],
+        "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+        "band_facets": [
+          "visible"
+        ]
+      }
+    }
+  ],
+  "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline.",
+  "record_hash": "48e5ffd53eef37bb560af6468a39daeef7e00a48e9f3fe5fa440fd17550b1a59",
+  "spectrum": {
+    "primary_wavelength_nm": 587.7218659920181,
+    "sampling_wavelengths_nm": [
+      486.2661779116133,
+      587.7218659920181,
+      656.4506882512153
+    ],
+    "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+    "band_facets": [
+      "visible"
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "schema": "opensci.lens.record",
+  "record_schema_version": "1.0",
+  "record_id": "ultrafast-50-f07-at-f07",
+  "record_revision": 1,
+  "title": "50 mm f/0.7 five-element objective at f/0.7",
+  "collection": {
+    "collection_id": "opensci-design-studies",
+    "source": "OpenSci reader-request optical design studies",
+    "source_input": "03_prime_50_f07/prescription.csv",
+    "source_input_sha256": "5b03ce679d423544792f89c828d1ce984e20aab0d2255ee30c7940094a84db0b",
+    "attribution": "50 mm f/0.7 five-element objective at f/0.7; numerical design study by OpenSci.",
+    "contributor": "JunLin615",
+    "redistribution": "Native design study contributed under the repository MIT License.",
+    "license": {
+      "spdx": "MIT",
+      "notice_path": "LICENSE",
+      "copyright": "Copyright (c) 2026 JunLin615"
+    }
+  },
+  "design": {
+    "design_scope": "COMPLETE_SYSTEM",
+    "lens_type": "camera_lens",
+    "design_family_id": "ultrafast-50-f07",
+    "function_tags": [
+      "imaging"
+    ],
+    "application_tags": [
+      "photography"
+    ],
+    "structure_tags": [
+      "refractive",
+      "fixed_focal_length"
+    ],
+    "configuration_count": 1,
+    "powered_element_count": 5,
+    "powered_group_count": 5,
+    "conjugate": "INFINITE_TO_FINITE"
+  },
+  "native_project": {
+    "path": "records/opensci-design-studies/ultrafast-50-f07-at-f07/project.json",
+    "sha256": "864fe60e9b4334e07e8f9f8abb28da0b13449d0e399aa222d1f1495db707298a",
+    "engine_version": "0.14.0",
+    "opening_outcome": "ACCEPTED",
+    "instance_id": "Objective",
+    "model_id": "Objective"
+  },
+  "image_format": {
+    "format_facets": [
+      "full_frame"
+    ],
+    "width_mm": 36,
+    "height_mm": 24,
+    "basis": "PROJECT_DECLARED rectangle at the image plane."
+  },
+  "first_order": {
+    "effective_focal_length_mm": {
+      "value": 49.99936512937865,
+      "basis": "ENGINE_COMPUTED",
+      "conditions": {
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Native paraxial effective focal length."
+    }
+  },
+  "aperture": {
+    "nominal_f_number": {
+      "value": 0.7,
+      "basis": "SOURCE_STATED",
+      "definition": "Nominal design iris setting at infinity.",
+      "system_aperture": true
+    },
+    "entrance_pupil_f_number": {
+      "value": 0.6999911118113011,
+      "basis": "PROJECT_DERIVED",
+      "conditions": {
+        "method": "axial_paraxial_clear_apertures",
+        "convention": "efl_over_admitted_entrance_pupil_diameter",
+        "conjugate": "infinite_to_finite",
+        "field": "on_axis",
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+      "system_aperture": true
+    }
+  },
+  "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline.",
+  "record_hash": "686feb5f28cc684ae5dcd5684d68a1618175daeb8ee50635f8d429411ed32783",
+  "spectrum": {
+    "primary_wavelength_nm": 587.7218659920181,
+    "sampling_wavelengths_nm": [
+      486.2661779116133,
+      587.7218659920181,
+      656.4506882512153
+    ],
+    "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+    "band_facets": [
+      "visible"
+    ]
+  }
+}
