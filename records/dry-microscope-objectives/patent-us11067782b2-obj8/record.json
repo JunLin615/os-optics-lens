@@ -1,0 +1,372 @@
+{
+ "schema": "opensci.lens.record",
+ "record_schema_version": "1.0",
+ "record_id": "patent-us11067782b2-obj8",
+ "record_revision": 1,
+ "title": "10x f/0.4 dry microscope objective, 0.17 mm cover glass (US11067782B2 objective 8)",
+ "collection": {
+  "collection_id": "dry-microscope-objectives",
+  "source": "Patent publication",
+  "source_input": "US11067782B2, Objective 8, lens data table",
+  "source_input_sha256": "ab7c03708e2cb0ce4d814c231b9be9c581eefda4f5dfa6eeb5a83a98702cc93c",
+  "attribution": "Olympus Corporation, US11067782B2. The prescription is the published numerical example; the native Project is a transcription of the cited table.",
+  "contributor": "OpenSci prescription intake",
+  "original_publication": {
+   "id": "US11067782B2",
+   "reference": "Objective 8, lens data table",
+   "assignee": "Olympus Corporation",
+   "url": "https://patents.google.com/patent/US11067782B2/en"
+  },
+  "redistribution": "The numerical prescription is published in a patent document, a public record. The transcription, the native Project and this evidence extract are distributed under MIT. The patent document itself is not redistributed.",
+  "license": {
+   "spdx": "MIT",
+   "notice_path": "LICENSE",
+   "copyright": "Copyright (c) 2026 JunLin615"
+  },
+  "evidence_extract": {
+   "path": "records/dry-microscope-objectives/patent-us11067782b2-obj8/evidence.json",
+   "sha256": "8de5a01725be79ff6b36560f1aa33ee7243db4d8ec9c23839d588f67a055cceb"
+  }
+ },
+ "design": {
+  "source_reference": "US11067782B2, Objective 8, lens data table",
+  "lens_type": "microscope_objective",
+  "design_family_id": "us11067782b2",
+  "design_scope": "COMPLETE_SYSTEM",
+  "function_tags": [
+   "imaging"
+  ],
+  "application_tags": [
+   "microscopy"
+  ],
+  "structure_tags": [
+   "refractive",
+   "fixed_focal_length"
+  ],
+  "immersion": "AIR",
+  "conjugate": "FINITE_TO_INFINITE",
+  "cover_glass": {
+   "thickness_mm": 0.17,
+   "basis": "SOURCE_STATED"
+  },
+  "magnification": null,
+  "configuration_count": 1,
+  "powered_element_count": 9,
+  "powered_group_count": 6,
+  "plane_parallel_plates": 1,
+  "aperture_validity": {
+   "state": "NO_STOP",
+   "stop_blocks_light": false,
+   "basis": "The source states no aperture stop; the beam is limited by the element clear apertures.",
+   "eligible_for_stop_dependent_evaluation": false,
+   "satisfies_stop_dependent_constraints": false,
+   "satisfaction_basis": "No field-dependent measurement or pupil sample is recorded, so a stop-dependent match is not claimed.",
+   "consequence": "A stop-dependent constraint stays unconfirmed for this record."
+  }
+ },
+ "native_project": {
+  "path": "records/dry-microscope-objectives/patent-us11067782b2-obj8/project.json",
+  "sha256": "d5ade4158caf9bbd99e34574e7e3fd91302ac5dc940a58ff288199635e423e99",
+  "engine_version": "0.14.0",
+  "catalog_version": null,
+  "instance_id": "LENS",
+  "model_id": "LENS",
+  "opening_outcome": "ACCEPTED",
+  "optical_validation": "PARAXIAL_MATCH"
+ },
+ "spectrum": {
+  "sampling_wavelengths_nm": [
+   546.219161
+  ],
+  "sampling_wavelengths_air_nm": [
+   546.07
+  ],
+  "sampling_wavelengths_basis": "The publication states its reference wavelength in air at 20 C and 101325 Pa; it is converted once with the engine's own air model (material_physics.air_index_exact) to the vacuum wavelength the engine evaluates.",
+  "incident_weights": [
+   1
+  ],
+  "primary_wavelength_nm": 546.219161,
+  "band_facets": [
+   "visible"
+  ],
+  "wavelength_precision": "The converted value is a computational value at full precision; a reviewer may pass it to the engine unchanged. Rounding in prose is for display only.",
+  "sampling_span_nm": {
+   "min_nm": 545.719161,
+   "max_nm": 546.719161,
+   "basis": "SINGLE_WAVELENGTH_BAND",
+   "eligible_for": "DISCOVERY_ONLY"
+  },
+  "continuous_coverage_nm": {
+   "state": "UNCONFIRMED",
+   "min_nm": null,
+   "max_nm": null,
+   "note": "The publication states a single reference wavelength, not a specified band."
+  }
+ },
+ "first_order": {
+  "effective_focal_length_mm": {
+   "value": 18.01917462684785,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 546.219161
+   },
+   "definition": "Signed paraxial effective focal length of the native Project."
+  },
+  "back_focal_length_mm": {
+   "value": -16.846774069003,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 546.219161,
+    "from": "final_optical_surface_vertex",
+    "to": "paraxial_rear_focal_point",
+    "distance_kind": "paraxial_focal_distance",
+    "conjugate": "infinite_to_finite"
+   },
+   "definition": "Signed paraxial distance from the last optical surface vertex to the rear focal point for collimated input."
+  },
+  "engine_check": {
+   "engine_version": "0.14.0",
+   "basis": "ENGINE_COMPUTED",
+   "method": "Thick-lens ABCD through the committed Project at the reference wavelength.",
+   "effective_focal_length_mm": 18.01917462684785,
+   "back_focal_length_mm": -16.846774069003,
+   "wavelength_nm": 546.219161,
+   "comparison": {
+    "rule": "|engine - source| <= atol + rtol * |source|. atol covers the printed focal length; rtol covers the prescription printed to three or four decimals in radius, thickness and index together with the engine's air-referenced index convention.",
+    "atol_mm": 0.005,
+    "rtol": 0.005,
+    "effective_focal_length": {
+     "source_mm": 18.0,
+     "engine_mm": 18.019174626767427,
+     "absolute_difference_mm": 0.019174626767426872,
+     "scale_mm": 18.0,
+     "scale_basis": "|EFL|",
+     "tolerance_mm": 0.095,
+     "within_tolerance": true,
+     "fraction_of_tolerance": 0.20183817649923022
+    },
+    "magnification": {
+     "state": "UNCONFIRMED",
+     "engine": null,
+     "basis": "The publication prints no magnification, or the output is collimated and a magnification needs a tube lens that this record does not carry."
+    }
+   }
+  },
+  "nominal_effective_focal_length_mm": {
+   "value": 18.0,
+   "basis": "SOURCE_STATED",
+   "definition": "Effective focal length as printed for the example",
+   "conditions": "Reference wavelength; the stated object distance.",
+   "engine_value_mm": 18.019174626767427
+  },
+  "optical_length_mm": {
+   "value": 47.6525,
+   "basis": "ENGINE_COMPUTED",
+   "definition": "First surface vertex to the exit vertex along the axis, from the committed Project",
+   "conditions": {
+    "from": "first_optical_surface_vertex",
+    "to": "final_optical_surface_vertex"
+   }
+  },
+  "object_to_first_optical_surface_mm": {
+   "value": 0.019203819889462723,
+   "basis": "PROJECT_DERIVED",
+   "conditions": {
+    "from": "specimen_waist",
+    "to": "first_optical_surface_vertex"
+   },
+   "definition": "Distance from the configured specimen to the first native optical surface, including a cover-glass face when present."
+  }
+ },
+ "aperture": {
+  "object_numerical_aperture": {
+   "value": 0.4,
+   "basis": "SOURCE_STATED",
+   "definition": "Object-side numerical aperture as printed for the example; an NA is not an f-number and is not converted to one",
+   "system_aperture": true
+  }
+ },
+ "object_space": {
+  "working_distance_mm": {
+   "value": 0.0,
+   "basis": "DERIVED",
+   "definition": "The object plane is the first surface of the prescription, so the working distance is zero",
+   "conditions": "Cover glass 0.17 mm"
+  },
+  "object_distance_mm": {
+   "value": 0.0,
+   "basis": "SOURCE_STATED",
+   "definition": "Distance from the object plane to the first surface vertex, the value the prescription tabulates"
+  },
+  "cover_glass_thickness_mm": {
+   "value": 0.17,
+   "basis": "SOURCE_STATED",
+   "definition": "Cover-glass thickness the design is corrected for"
+  },
+  "medium": "AIR"
+ },
+ "field": {
+  "kind": "OBJECT_HEIGHT",
+  "max_object_height_mm": 1.1,
+  "basis": "SOURCE_STATED",
+  "definition": "Largest object-space field height the publication states",
+  "note": null
+ },
+ "materials": {
+  "basis": "Each glass is modelled from the printed nd and Abbe number: a two-term Cauchy curve through (nd, Vd) is fitted by a three-term Sellmeier with fixed poles over 450-660 nm.",
+  "catalog_comparisons": [],
+  "model_glasses": [
+   {
+    "model_id": "M-1.5240-54.41",
+    "dispersion": {
+     "kind": "SELLMEIER",
+     "b": [
+      0.26757890400711,
+      1.0161174849803172,
+      0.5472184639627133
+     ],
+     "c_um2": [
+      0.0035,
+      0.0125,
+      90.0
+     ]
+    },
+    "valid_band_nm": {
+     "min_nm": 450.0,
+     "max_nm": 660.0
+    },
+    "basis": "ND_VD_CAUCHY_SELLMEIER fit to the printed nd=1.52397 and Vd=54.41"
+   },
+   {
+    "model_id": "M-1.5584-54.01",
+    "dispersion": {
+     "kind": "SELLMEIER",
+     "b": [
+      0.2619282178579716,
+      1.1239794576589126,
+      0.5997902010487572
+     ],
+     "c_um2": [
+      0.0035,
+      0.0125,
+      90.0
+     ]
+    },
+    "valid_band_nm": {
+     "min_nm": 450.0,
+     "max_nm": 660.0
+    },
+    "basis": "ND_VD_CAUCHY_SELLMEIER fit to the printed nd=1.55836 and Vd=54.01"
+   },
+   {
+    "model_id": "M-1.4387-94.66",
+    "dispersion": {
+     "kind": "SELLMEIER",
+     "b": [
+      0.7522043960478205,
+      0.29959973828386094,
+      0.19617117749258753
+     ],
+     "c_um2": [
+      0.0035,
+      0.0125,
+      90.0
+     ]
+    },
+    "valid_band_nm": {
+     "min_nm": 450.0,
+     "max_nm": 660.0
+    },
+    "basis": "ND_VD_CAUCHY_SELLMEIER fit to the printed nd=1.43875 and Vd=94.66"
+   },
+   {
+    "model_id": "M-1.5163-64.14",
+    "dispersion": {
+     "kind": "SELLMEIER",
+     "b": [
+      0.49093884460996146,
+      0.7758365311144492,
+      0.4359397140785534
+     ],
+     "c_um2": [
+      0.0035,
+      0.0125,
+      90.0
+     ]
+    },
+    "valid_band_nm": {
+     "min_nm": 450.0,
+     "max_nm": 660.0
+    },
+    "basis": "ND_VD_CAUCHY_SELLMEIER fit to the printed nd=1.51633 and Vd=64.14"
+   }
+  ]
+ },
+ "approximations": [
+  {
+   "code": "ND_VD_DISPERSION_MODEL",
+   "description": "The publication states nd and Vd only. A two-term Cauchy curve is solved exactly from those two values and a three-term Sellmeier with fixed poles is fitted to it over the stated band. The index at the reference wavelength is the source's nd; the dispersion curve is a model."
+  },
+  {
+   "code": "INDEX_REFERENCE_AIR",
+   "description": "The Project's environment is air, so the engine reports first-order quantities relative to the air index at the reference wavelength; the source's own focal length is a design value."
+  },
+  {
+   "code": "CLEAR_APERTURES_DERIVED",
+   "description": "The publication states no clear apertures. Each semi-diameter is the height of the real meridional marginal ray at the stated object-side NA with a mechanical allowance, reduced where an element edge or an air gap would otherwise be impossible. They are estimates, not the source's own apertures."
+  },
+  {
+   "code": "AFOCAL_OUTPUT_OBSERVATION",
+   "description": "The design is corrected for an infinite image distance, so the Project places the observation plane at a finite standoff instead of at a focal point; no image-side quantity is claimed."
+  }
+ ],
+ "unsupported_constructs": [],
+ "validation": {
+  "conversion": "PASSED",
+  "project_check": "ACCEPTED",
+  "optical_solids": "VALID",
+  "paraxial": "MATCHED",
+  "paraxial_scope": "effective focal length",
+  "engine_version": "0.14.0",
+  "solids_findings": [
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element LENS member L2: the M-1.5584-54.01 between S1 and S2 is 8.2792 mm thick at its edge, 100% of its clear diameter 8.3062 mm, above the review ratio 35%",
+    "instance_id": "LENS",
+    "member_id": "L2",
+    "surface_id": "S1",
+    "other_surface_id": "S2",
+    "value_mm": 8.279186,
+    "limit_mm": 2.907183,
+    "location": "component LENS member L2 surface S1"
+   },
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element LENS member L5: the M-1.5163-64.14 between S2 and S3 is 10.2391 mm thick at its edge, 109% of its clear diameter 9.4126 mm, above the review ratio 35%",
+    "instance_id": "LENS",
+    "member_id": "L5",
+    "surface_id": "S2",
+    "other_surface_id": "S3",
+    "value_mm": 10.239149,
+    "limit_mm": 3.294404,
+    "location": "component LENS member L5 surface S2"
+   },
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element LENS member L6: the M-1.5163-64.14 between S1 and S2 is 6.5363 mm thick at its edge, 69% of its clear diameter 9.4126 mm, above the review ratio 35%",
+    "instance_id": "LENS",
+    "member_id": "L6",
+    "surface_id": "S1",
+    "other_surface_id": "S2",
+    "value_mm": 6.536331,
+    "limit_mm": 3.294404,
+    "location": "component LENS member L6 surface S1"
+   }
+  ]
+ },
+ "record_hash": "94f8e2da76ce02b43bfc469e0a663ac7998c80d9f438a9ecca01c33d36a10b15",
+ "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline."
+}

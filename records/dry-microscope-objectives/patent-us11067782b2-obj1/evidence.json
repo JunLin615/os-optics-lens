@@ -1,0 +1,278 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "schema_version": "1.0",
+ "record_id": "patent-us11067782b2-obj1",
+ "source": {
+  "publication": "US11067782B2",
+  "url": "https://patents.google.com/patent/US11067782B2/en",
+  "assignee": "Olympus Corporation",
+  "title": "10x f/0.4 dry microscope objective, 0.17 mm cover glass (US11067782B2 objective 1)",
+  "locator": "Objective 1, lens data table"
+ },
+ "sections": {
+  "stated": {
+   "effective_focal_length_mm": 18.0,
+   "object_numerical_aperture": 0.4,
+   "magnification": null,
+   "working_distance_mm": null,
+   "cover_glass_thickness_mm": 0.17,
+   "object_distance_mm": 0.0,
+   "reference_wavelength_nm": 546.07,
+   "immersion": "AIR",
+   "conjugate": "INFINITE_TO_FINITE"
+  },
+  "prescription": {
+   "format": "tsv",
+   "columns": [
+    "surface",
+    "label",
+    "radius_mm",
+    "thickness_mm",
+    "material",
+    "semi_diameter_mm",
+    "stop",
+    "note"
+   ],
+   "text": "surface\tlabel\tradius_mm\tthickness_mm\tmaterial\tsemi_diameter_mm\tstop\tnote\n1\tcover glass front (s0 = object surface)\t\t0.17\t{\"abbe_vd\": 54.41, \"index_nd\": 1.52397, \"model\": \"M-1.5240-54.41\"}\t1.1\tFalse\tEDGE_CAPPED\n2\t\t\t3.7115\t\t1.1\tFalse\tEDGE_CAPPED\n3\tL1 front glass 6 (CL1 in G1)\t-8.3986\t4.2209\t{\"abbe_vd\": 44.49, \"index_nd\": 1.61336, \"model\": \"M-1.6134-44.49\"}\t3.55526\tFalse\t\n4\tL1-L2 cemented interface glass 2 (CL1 in G1)\t12.1766\t3.4801\t{\"abbe_vd\": 81.54, \"index_nd\": 1.497, \"model\": \"M-1.4970-81.54\"}\t3.55526\tFalse\t\n5\t\t-10.5755\t0.2002\t\t4.528461\tFalse\t\n6\tL3 front glass 1 (G1)\t125.8891\t2.8103\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t5.560465\tFalse\t\n7\t\t-18.6353\t0.2005\t\t5.560465\tFalse\t\n8\tL4 front glass 1 (G1)\t14.7946\t4.4811\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t6.143819\tFalse\t\n9\t\t-18.4565\t1.6867\t\t6.143819\tFalse\t\n10\tL5 front glass 1 (CL2 in G1)\t12.8039\t4.81\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t5.394313\tFalse\tEDGE_CAPPED\n11\tL5-L6 cemented interface glass 3 (CL2 in G1)\t-9.1339\t4.4901\t{\"abbe_vd\": 64.14, \"index_nd\": 1.51633, \"model\": \"M-1.5163-64.14\"}\t5.070654\tFalse\tEDGE_CAPPED\n12\t\t7.2434\t5.7114\t\t4.428964\tFalse\tEDGE_CAPPED\n13\tL7 front glass 3 (CL3 in G2)\t-5.268\t2.9001\t{\"abbe_vd\": 64.14, \"index_nd\": 1.51633, \"model\": \"M-1.5163-64.14\"}\t4.428964\tFalse\tEDGE_CAPPED\n14\tL7-L8 cemented interface glass 1 (CL3 in G2)\t70.4239\t4.17\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t4.428964\tFalse\tEDGE_CAPPED\n15\t\t-10.1954\t0.2264\t\t4.852882\tFalse\tEDGE_CAPPED\n16\tL9 front glass 1 (G2)\t-199.538\t3.53\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t7.927734\tFalse\t\n17\t\t-13.7504\t\t\t7.927734\tFalse\t\n",
+   "units": "mm",
+   "wavelength_convention": "The publication states its reference wavelength as an air wavelength.",
+   "surface_count": 17,
+   "surfaces": [
+    {
+     "surface": 1,
+     "label": "cover glass front (s0 = object surface)",
+     "radius_mm": null,
+     "thickness_mm": 0.17,
+     "material": {
+      "index_nd": 1.52397,
+      "abbe_vd": 54.41,
+      "model": "M-1.5240-54.41"
+     },
+     "semi_diameter_mm": 1.1,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "cover glass front (s0 = object surface)"
+    },
+    {
+     "surface": 2,
+     "label": "",
+     "radius_mm": null,
+     "thickness_mm": 3.7115,
+     "material": null,
+     "semi_diameter_mm": 1.1,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 3,
+     "label": "L1 front glass 6 (CL1 in G1)",
+     "radius_mm": -8.3986,
+     "thickness_mm": 4.2209,
+     "material": {
+      "index_nd": 1.61336,
+      "abbe_vd": 44.49,
+      "model": "M-1.6134-44.49"
+     },
+     "semi_diameter_mm": 3.55526,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L1 front glass 6 (CL1 in G1)"
+    },
+    {
+     "surface": 4,
+     "label": "L1-L2 cemented interface glass 2 (CL1 in G1)",
+     "radius_mm": 12.1766,
+     "thickness_mm": 3.4801,
+     "material": {
+      "index_nd": 1.497,
+      "abbe_vd": 81.54,
+      "model": "M-1.4970-81.54"
+     },
+     "semi_diameter_mm": 3.55526,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L1-L2 cemented interface glass 2 (CL1 in G1)"
+    },
+    {
+     "surface": 5,
+     "label": "",
+     "radius_mm": -10.5755,
+     "thickness_mm": 0.2002,
+     "material": null,
+     "semi_diameter_mm": 4.528461,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 6,
+     "label": "L3 front glass 1 (G1)",
+     "radius_mm": 125.8891,
+     "thickness_mm": 2.8103,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 5.560465,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L3 front glass 1 (G1)"
+    },
+    {
+     "surface": 7,
+     "label": "",
+     "radius_mm": -18.6353,
+     "thickness_mm": 0.2005,
+     "material": null,
+     "semi_diameter_mm": 5.560465,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 8,
+     "label": "L4 front glass 1 (G1)",
+     "radius_mm": 14.7946,
+     "thickness_mm": 4.4811,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 6.143819,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L4 front glass 1 (G1)"
+    },
+    {
+     "surface": 9,
+     "label": "",
+     "radius_mm": -18.4565,
+     "thickness_mm": 1.6867,
+     "material": null,
+     "semi_diameter_mm": 6.143819,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 10,
+     "label": "L5 front glass 1 (CL2 in G1)",
+     "radius_mm": 12.8039,
+     "thickness_mm": 4.81,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 5.394313,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L5 front glass 1 (CL2 in G1)"
+    },
+    {
+     "surface": 11,
+     "label": "L5-L6 cemented interface glass 3 (CL2 in G1)",
+     "radius_mm": -9.1339,
+     "thickness_mm": 4.4901,
+     "material": {
+      "index_nd": 1.51633,
+      "abbe_vd": 64.14,
+      "model": "M-1.5163-64.14"
+     },
+     "semi_diameter_mm": 5.070654,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L5-L6 cemented interface glass 3 (CL2 in G1)"
+    },
+    {
+     "surface": 12,
+     "label": "",
+     "radius_mm": 7.2434,
+     "thickness_mm": 5.7114,
+     "material": null,
+     "semi_diameter_mm": 4.428964,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 13,
+     "label": "L7 front glass 3 (CL3 in G2)",
+     "radius_mm": -5.268,
+     "thickness_mm": 2.9001,
+     "material": {
+      "index_nd": 1.51633,
+      "abbe_vd": 64.14,
+      "model": "M-1.5163-64.14"
+     },
+     "semi_diameter_mm": 4.428964,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L7 front glass 3 (CL3 in G2)"
+    },
+    {
+     "surface": 14,
+     "label": "L7-L8 cemented interface glass 1 (CL3 in G2)",
+     "radius_mm": 70.4239,
+     "thickness_mm": 4.17,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 4.428964,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L7-L8 cemented interface glass 1 (CL3 in G2)"
+    },
+    {
+     "surface": 15,
+     "label": "",
+     "radius_mm": -10.1954,
+     "thickness_mm": 0.2264,
+     "material": null,
+     "semi_diameter_mm": 4.852882,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 16,
+     "label": "L9 front glass 1 (G2)",
+     "radius_mm": -199.538,
+     "thickness_mm": 3.53,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 7.927734,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L9 front glass 1 (G2)"
+    },
+    {
+     "surface": 17,
+     "label": "",
+     "radius_mm": -13.7504,
+     "thickness_mm": null,
+     "material": null,
+     "semi_diameter_mm": 7.927734,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    }
+   ]
+  },
+  "derivation": {
+   "clear_apertures": "DERIVED from the real meridional marginal ray at the stated object-side NA, with a mechanical allowance and the element edge and air-gap limits",
+   "wavelength_conversion": "The stated air wavelength is converted once to vacuum with the engine's own air model (material_physics.air_index_exact); the record keeps both values.",
+   "image_distance_mm": 50.0,
+   "magnification_from_abcd": null,
+   "afocal_output": true
+  }
+ }
+}

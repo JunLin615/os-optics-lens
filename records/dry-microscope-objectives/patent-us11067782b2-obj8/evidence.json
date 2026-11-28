@@ -1,0 +1,278 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "schema_version": "1.0",
+ "record_id": "patent-us11067782b2-obj8",
+ "source": {
+  "publication": "US11067782B2",
+  "url": "https://patents.google.com/patent/US11067782B2/en",
+  "assignee": "Olympus Corporation",
+  "title": "10x f/0.4 dry microscope objective, 0.17 mm cover glass (US11067782B2 objective 8)",
+  "locator": "Objective 8, lens data table"
+ },
+ "sections": {
+  "stated": {
+   "effective_focal_length_mm": 18.0,
+   "object_numerical_aperture": 0.4,
+   "magnification": null,
+   "working_distance_mm": null,
+   "cover_glass_thickness_mm": 0.17,
+   "object_distance_mm": 0.0,
+   "reference_wavelength_nm": 546.07,
+   "immersion": "AIR",
+   "conjugate": "INFINITE_TO_FINITE"
+  },
+  "prescription": {
+   "format": "tsv",
+   "columns": [
+    "surface",
+    "label",
+    "radius_mm",
+    "thickness_mm",
+    "material",
+    "semi_diameter_mm",
+    "stop",
+    "note"
+   ],
+   "text": "surface\tlabel\tradius_mm\tthickness_mm\tmaterial\tsemi_diameter_mm\tstop\tnote\n1\tcover glass front\t\t0.17\t{\"abbe_vd\": 54.41, \"index_nd\": 1.52397, \"model\": \"M-1.5240-54.41\"}\t1.1\tFalse\tEDGE_CAPPED\n2\t\t\t3.6982\t\t1.1\tFalse\tEDGE_CAPPED\n3\tL1\t-10.3542\t5.8285\t{\"abbe_vd\": 54.01, \"index_nd\": 1.55836, \"model\": \"M-1.5584-54.01\"}\t4.153118\tFalse\t\n4\tL2\t11.7905\t3.5178\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t4.153118\tFalse\t\n5\t\t-12.494\t0.0001\t\t5.04946\tFalse\t\n6\tL3\t-837.7759\t2.7668\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t6.001196\tFalse\t\n7\t\t-17.1406\t0.0001\t\t6.001196\tFalse\t\n8\tL4\t15.0797\t4.4162\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t6.637283\tFalse\t\n9\t\t-17.4232\t0.0581\t\t6.637283\tFalse\t\n10\tL5\t15.7239\t4.8008\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t5.943209\tFalse\tEDGE_CAPPED\n11\tL6\t-9.9671\t5.8284\t{\"abbe_vd\": 64.14, \"index_nd\": 1.51633, \"model\": \"M-1.5163-64.14\"}\t5.586616\tFalse\tEDGE_CAPPED\n12\t\t8.4458\t5.8224\t\t4.706291\tFalse\tEDGE_CAPPED\n13\tL7\t-5.5953\t2.8725\t{\"abbe_vd\": 64.14, \"index_nd\": 1.51633, \"model\": \"M-1.5163-64.14\"}\t4.706291\tFalse\tEDGE_CAPPED\n14\tL8\t54.2094\t4.1471\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t4.706291\tFalse\tEDGE_CAPPED\n15\t\t-10.712\t0.215\t\t5.15439\tFalse\tEDGE_CAPPED\n16\tL9\t-144.4003\t3.5105\t{\"abbe_vd\": 94.66, \"index_nd\": 1.43875, \"model\": \"M-1.4387-94.66\"}\t7.928509\tFalse\t\n17\t\t-14.2837\t\t\t7.928509\tFalse\t\n",
+   "units": "mm",
+   "wavelength_convention": "The publication states its reference wavelength as an air wavelength.",
+   "surface_count": 17,
+   "surfaces": [
+    {
+     "surface": 1,
+     "label": "cover glass front",
+     "radius_mm": null,
+     "thickness_mm": 0.17,
+     "material": {
+      "index_nd": 1.52397,
+      "abbe_vd": 54.41,
+      "model": "M-1.5240-54.41"
+     },
+     "semi_diameter_mm": 1.1,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "cover glass front"
+    },
+    {
+     "surface": 2,
+     "label": "",
+     "radius_mm": null,
+     "thickness_mm": 3.6982,
+     "material": null,
+     "semi_diameter_mm": 1.1,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 3,
+     "label": "L1",
+     "radius_mm": -10.3542,
+     "thickness_mm": 5.8285,
+     "material": {
+      "index_nd": 1.55836,
+      "abbe_vd": 54.01,
+      "model": "M-1.5584-54.01"
+     },
+     "semi_diameter_mm": 4.153118,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L1"
+    },
+    {
+     "surface": 4,
+     "label": "L2",
+     "radius_mm": 11.7905,
+     "thickness_mm": 3.5178,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 4.153118,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L2"
+    },
+    {
+     "surface": 5,
+     "label": "",
+     "radius_mm": -12.494,
+     "thickness_mm": 0.0001,
+     "material": null,
+     "semi_diameter_mm": 5.04946,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 6,
+     "label": "L3",
+     "radius_mm": -837.7759,
+     "thickness_mm": 2.7668,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 6.001196,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L3"
+    },
+    {
+     "surface": 7,
+     "label": "",
+     "radius_mm": -17.1406,
+     "thickness_mm": 0.0001,
+     "material": null,
+     "semi_diameter_mm": 6.001196,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 8,
+     "label": "L4",
+     "radius_mm": 15.0797,
+     "thickness_mm": 4.4162,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 6.637283,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L4"
+    },
+    {
+     "surface": 9,
+     "label": "",
+     "radius_mm": -17.4232,
+     "thickness_mm": 0.0581,
+     "material": null,
+     "semi_diameter_mm": 6.637283,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 10,
+     "label": "L5",
+     "radius_mm": 15.7239,
+     "thickness_mm": 4.8008,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 5.943209,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L5"
+    },
+    {
+     "surface": 11,
+     "label": "L6",
+     "radius_mm": -9.9671,
+     "thickness_mm": 5.8284,
+     "material": {
+      "index_nd": 1.51633,
+      "abbe_vd": 64.14,
+      "model": "M-1.5163-64.14"
+     },
+     "semi_diameter_mm": 5.586616,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L6"
+    },
+    {
+     "surface": 12,
+     "label": "",
+     "radius_mm": 8.4458,
+     "thickness_mm": 5.8224,
+     "material": null,
+     "semi_diameter_mm": 4.706291,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 13,
+     "label": "L7",
+     "radius_mm": -5.5953,
+     "thickness_mm": 2.8725,
+     "material": {
+      "index_nd": 1.51633,
+      "abbe_vd": 64.14,
+      "model": "M-1.5163-64.14"
+     },
+     "semi_diameter_mm": 4.706291,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L7"
+    },
+    {
+     "surface": 14,
+     "label": "L8",
+     "radius_mm": 54.2094,
+     "thickness_mm": 4.1471,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 4.706291,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L8"
+    },
+    {
+     "surface": 15,
+     "label": "",
+     "radius_mm": -10.712,
+     "thickness_mm": 0.215,
+     "material": null,
+     "semi_diameter_mm": 5.15439,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    },
+    {
+     "surface": 16,
+     "label": "L9",
+     "radius_mm": -144.4003,
+     "thickness_mm": 3.5105,
+     "material": {
+      "index_nd": 1.43875,
+      "abbe_vd": 94.66,
+      "model": "M-1.4387-94.66"
+     },
+     "semi_diameter_mm": 7.928509,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": "L9"
+    },
+    {
+     "surface": 17,
+     "label": "",
+     "radius_mm": -14.2837,
+     "thickness_mm": null,
+     "material": null,
+     "semi_diameter_mm": 7.928509,
+     "semi_diameter_basis": "DERIVED",
+     "stop": false,
+     "note": ""
+    }
+   ]
+  },
+  "derivation": {
+   "clear_apertures": "DERIVED from the real meridional marginal ray at the stated object-side NA, with a mechanical allowance and the element edge and air-gap limits",
+   "wavelength_conversion": "The stated air wavelength is converted once to vacuum with the engine's own air model (material_physics.air_index_exact); the record keeps both values.",
+   "image_distance_mm": 50.0,
+   "magnification_from_abcd": null,
+   "afocal_output": true
+  }
+ }
+}
