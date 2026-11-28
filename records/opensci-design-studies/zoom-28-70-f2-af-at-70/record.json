@@ -1,0 +1,141 @@
+{
+  "schema": "opensci.lens.record",
+  "record_schema_version": "1.1",
+  "record_id": "zoom-28-70-f2-af-at-70",
+  "record_revision": 1,
+  "title": "28–70 mm f/2 internal-focus zoom at 70 mm",
+  "collection": {
+    "collection_id": "opensci-design-studies",
+    "source": "OpenSci reader-request optical design studies",
+    "source_input": "01_zoom_28_70_f2_af/prescription.csv",
+    "source_input_sha256": "1c30ebaf2adecac7abcb8ce049fcdfe2e13d35e0f5c92e55edb0b053d7048182",
+    "attribution": "28–70 mm f/2 internal-focus zoom at 70 mm; numerical design study by OpenSci.",
+    "contributor": "JunLin615",
+    "redistribution": "Native design study contributed under the repository MIT License.",
+    "license": {
+      "spdx": "MIT",
+      "notice_path": "LICENSE",
+      "copyright": "Copyright (c) 2026 JunLin615"
+    },
+    "original_publication": {
+      "id": "JP2025163723A",
+      "reference": "Starting architecture, example 1; reoptimized design study.",
+      "url": "https://patents.google.com/patent/JP2025163723A/en"
+    }
+  },
+  "design": {
+    "design_scope": "COMPLETE_SYSTEM",
+    "lens_type": "camera_lens",
+    "design_family_id": "zoom-28-70-f2-af",
+    "function_tags": [
+      "imaging"
+    ],
+    "application_tags": [
+      "photography"
+    ],
+    "structure_tags": [
+      "refractive",
+      "zoom"
+    ],
+    "configuration_count": 2,
+    "powered_element_count": 19,
+    "powered_group_count": 15
+  },
+  "native_project": {
+    "path": "records/opensci-design-studies/zoom-28-70-f2-af-at-70/project.json",
+    "sha256": "c94ee0fbba4f627aadca361bc490c257cd7213dd146d28b28c81f421c192e28f",
+    "engine_version": "0.14.0",
+    "opening_outcome": "ACCEPTED"
+  },
+  "image_format": {
+    "format_facets": [
+      "full_frame"
+    ],
+    "width_mm": 36,
+    "height_mm": 24,
+    "basis": "PROJECT_DECLARED rectangle at the image plane."
+  },
+  "configurations": [
+    {
+      "configuration_id": "Infinity",
+      "label": "Infinity",
+      "conjugate": "INFINITE_TO_FINITE",
+      "first_order": {
+        "effective_focal_length_mm": {
+          "value": 69.99996799385556,
+          "basis": "ENGINE_COMPUTED",
+          "conditions": {
+            "wavelength_nm": 587.7218659920181
+          },
+          "definition": "Native paraxial effective focal length."
+        }
+      },
+      "aperture": {
+        "nominal_f_number": {
+          "value": 2,
+          "basis": "SOURCE_STATED",
+          "definition": "Nominal design iris setting at infinity.",
+          "system_aperture": true
+        },
+        "entrance_pupil_f_number": {
+          "value": 1.9188330898111075,
+          "basis": "PROJECT_DERIVED",
+          "conditions": {
+            "method": "axial_paraxial_clear_apertures",
+            "convention": "efl_over_admitted_entrance_pupil_diameter",
+            "conjugate": "infinite_to_finite",
+            "field": "on_axis",
+            "wavelength_nm": 587.7218659920181
+          },
+          "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+          "system_aperture": true
+        }
+      }
+    },
+    {
+      "configuration_id": "Focus1m",
+      "label": "Object 1 m from first vertex",
+      "conjugate": "FINITE_TO_FINITE",
+      "first_order": {
+        "effective_focal_length_mm": {
+          "value": 66.23705830613928,
+          "basis": "ENGINE_COMPUTED",
+          "conditions": {
+            "wavelength_nm": 587.7218659920181
+          },
+          "definition": "Native paraxial effective focal length."
+        }
+      },
+      "aperture": {
+        "paraxial_working_f_number": {
+          "value": 1.9434255604970807,
+          "basis": "PROJECT_DERIVED",
+          "conditions": {
+            "method": "axial_paraxial_clear_apertures",
+            "convention": "paraxial_image_space_marginal_ray",
+            "conjugate": "finite_to_finite",
+            "field": "on_axis",
+            "wavelength_nm": 587.7218659920181,
+            "object_distance_mm": 1000.0
+          },
+          "definition": "Reciprocal of twice the admitted axial marginal ray's reduced image angle.",
+          "system_aperture": true
+        }
+      }
+    }
+  ],
+  "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline.",
+  "record_hash": "74a689e523754462e6216f2299c83cb51dd64d342094065f922cbe6cd1dbca0a",
+  "spectrum": {
+    "primary_wavelength_nm": 587.7218659920181,
+    "sampling_wavelengths_nm": [
+      486.2661779116133,
+      587.7218659920181,
+      656.4506882512153
+    ],
+    "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+    "band_facets": [
+      "visible"
+    ]
+  }
+}

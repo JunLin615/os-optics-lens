@@ -1,0 +1,816 @@
+{
+  "schema": "opensci.project",
+  "project_schema_version": "2.0",
+  "design_intent": "OPTICAL_SYSTEM",
+  "components": [
+    {
+      "instance_id": "Objective",
+      "optical_role": "lens",
+      "optical_model_id": "Objective",
+      "nominal_pose": {
+        "position_mm": [
+          0.0,
+          0,
+          0
+        ],
+        "quaternion_wxyz": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "custom_part": {
+        "custom_part_key": "Objective",
+        "description": "Imaging assembly member Objective"
+      },
+      "selected_parameters": [],
+      "retained_dofs": []
+    },
+    {
+      "instance_id": "AxialSource",
+      "optical_role": "source",
+      "custom_part": {
+        "custom_part_key": "AxialSource",
+        "description": "Axial evaluation beam. In finite-conjugate states its waist is at the object plane."
+      },
+      "nominal_pose": {
+        "position_mm": [
+          -50.0,
+          0,
+          0
+        ],
+        "quaternion_wxyz": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "selected_parameters": [],
+      "retained_dofs": [],
+      "source_model": {
+        "model_kind": "GAUSSIAN_BEAM",
+        "waist_radius_mm": 0.75,
+        "waist_position_mm": 0,
+        "m2": 1,
+        "polarization": {
+          "kind": "UNPOLARIZED"
+        },
+        "spectral_lines": [
+          {
+            "wavelength_nm": 486.2661779116133,
+            "power_w": 0.00025
+          },
+          {
+            "wavelength_nm": 587.7218659920181,
+            "power_w": 0.0005
+          },
+          {
+            "wavelength_nm": 656.4506882512153,
+            "power_w": 0.00025
+          }
+        ]
+      }
+    }
+  ],
+  "optical_models": [
+    {
+      "model_id": "Objective",
+      "display_name": "Objective",
+      "model": {
+        "model_kind": "COMPOUND",
+        "model_version": "1",
+        "members": [
+          {
+            "member_id": "L01",
+            "model_id": "L01",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                0.0
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "L02",
+            "model_id": "L02",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                5.2134525078406115
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "STOP",
+            "model_id": "Stop",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                9.854922624925605
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "L03",
+            "model_id": "L03",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                12.127823574777075
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "L04",
+            "model_id": "L04",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                12.987237363636204
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "MOUNT",
+            "model_id": "Mount",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                19.36499956265289
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "member_id": "L05",
+            "model_id": "L05",
+            "pose": {
+              "position_mm": [
+                0,
+                0,
+                32.21499956265289
+              ],
+              "quaternion_wxyz": [
+                1,
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "envelope": {
+          "kind": "CYLINDER",
+          "diameter_mm": "80",
+          "z_min_mm": "-0.01",
+          "z_max_mm": "33.73",
+          "status": "DERIVED"
+        }
+      }
+    },
+    {
+      "model_id": "L01",
+      "display_name": "L01",
+      "model": {
+        "model_kind": "SURFACE_SEQUENCE",
+        "model_version": "2",
+        "fidelity": "SURFACE_PRESCRIPTION",
+        "surfaces": [
+          {
+            "surface_id": "S1",
+            "vertex_z_mm": "0",
+            "clear_radius_mm": "9.213735933179095",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "11.410010905329065",
+            "aspheric_coefficients": [
+              "0.000002920573618503818",
+              "0.0000002385893095611769",
+              "-0.000000004190950349737503",
+              "0.00000000003702984307366402"
+            ]
+          },
+          {
+            "surface_id": "S2",
+            "vertex_z_mm": "0.5462955754421243",
+            "clear_radius_mm": "9.213735933179095",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "11.002436820736955"
+          },
+          {
+            "surface_id": "S3",
+            "vertex_z_mm": "5.078111814199271",
+            "clear_radius_mm": "9.213735933179095",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "26.5620143370705",
+            "aspheric_coefficients": [
+              "-0.00010129566152756021",
+              "0.0000007761153077912145",
+              "-0.000000004218682642549689",
+              "0.00000000001615104227073815"
+            ]
+          }
+        ],
+        "media": [
+          "N-F2",
+          "N-LAK14"
+        ],
+        "edge_radius_mm": "9.393735933179094",
+        "status": "SPECIFIED",
+        "valid_band_nm": {
+          "min_nm": "480.132",
+          "max_nm": "660.179",
+          "status": "DERIVED"
+        },
+        "approximations": [
+          "EDGE_AS_OPAQUE_RIM",
+          "GHOST_REFLECTIONS_NOT_TRACED",
+          "IDEAL_SURFACE_FIGURE",
+          "NOMINAL_PRESCRIPTION"
+        ]
+      }
+    },
+    {
+      "model_id": "L02",
+      "display_name": "L02",
+      "model": {
+        "model_kind": "SURFACE_SEQUENCE",
+        "model_version": "2",
+        "fidelity": "SURFACE_PRESCRIPTION",
+        "surfaces": [
+          {
+            "surface_id": "S1",
+            "vertex_z_mm": "0",
+            "clear_radius_mm": "7.206510020268365",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "15.310626762879",
+            "aspheric_coefficients": [
+              "-0.00021002419363793973",
+              "0.000002258499006755572",
+              "-0.00000005374649730735124",
+              "0.00000000043078669268414624"
+            ]
+          },
+          {
+            "surface_id": "S2",
+            "vertex_z_mm": "1.831439736651892",
+            "clear_radius_mm": "7.206510020268365",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "9.139018424885972",
+            "aspheric_coefficients": [
+              "-0.000028269412742057725",
+              "0.0000012773686936324097",
+              "-0.000000026160093648274086",
+              "-0.0000000020309528044740023"
+            ]
+          }
+        ],
+        "media": [
+          "S-TIH3"
+        ],
+        "edge_radius_mm": "7.386510020268365",
+        "status": "SPECIFIED",
+        "valid_band_nm": {
+          "min_nm": "480.132",
+          "max_nm": "660.179",
+          "status": "DERIVED"
+        },
+        "approximations": [
+          "EDGE_AS_OPAQUE_RIM",
+          "GHOST_REFLECTIONS_NOT_TRACED",
+          "IDEAL_SURFACE_FIGURE",
+          "NOMINAL_PRESCRIPTION"
+        ]
+      }
+    },
+    {
+      "model_id": "Stop",
+      "display_name": "Stop",
+      "model": {
+        "model_kind": "APERTURE_STOP",
+        "model_version": "1",
+        "opening_radius_mm": "4.746105301073545",
+        "edge_radius_mm": "7.386510020268365",
+        "plane_z_mm": "0",
+        "status": "SPECIFIED"
+      }
+    },
+    {
+      "model_id": "L03",
+      "display_name": "L03",
+      "model": {
+        "model_kind": "SURFACE_SEQUENCE",
+        "model_version": "2",
+        "fidelity": "SURFACE_PRESCRIPTION",
+        "surfaces": [
+          {
+            "surface_id": "S1",
+            "vertex_z_mm": "0",
+            "clear_radius_mm": "5.997814973254422",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "-9.110750896424728",
+            "aspheric_coefficients": [
+              "-0.00047745263356698046",
+              "0.0000026261360846874678",
+              "0.00000005450951782666512",
+              "0.000000008848645012745179"
+            ]
+          },
+          {
+            "surface_id": "S2",
+            "vertex_z_mm": "0.6675686897258934",
+            "clear_radius_mm": "5.997814973254422",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "-9.251396881190308",
+            "aspheric_coefficients": [
+              "-0.0003089378454787285",
+              "-0.00000627208721102192",
+              "0.0000004838505170488207",
+              "0.0000000027037700070373897"
+            ]
+          }
+        ],
+        "media": [
+          "S-TIM28"
+        ],
+        "edge_radius_mm": "6.177814973254422",
+        "status": "SPECIFIED",
+        "valid_band_nm": {
+          "min_nm": "480.132",
+          "max_nm": "660.179",
+          "status": "DERIVED"
+        },
+        "approximations": [
+          "EDGE_AS_OPAQUE_RIM",
+          "GHOST_REFLECTIONS_NOT_TRACED",
+          "IDEAL_SURFACE_FIGURE",
+          "NOMINAL_PRESCRIPTION"
+        ]
+      }
+    },
+    {
+      "model_id": "L04",
+      "display_name": "L04",
+      "model": {
+        "model_kind": "SURFACE_SEQUENCE",
+        "model_version": "2",
+        "fidelity": "SURFACE_PRESCRIPTION",
+        "surfaces": [
+          {
+            "surface_id": "S1",
+            "vertex_z_mm": "0",
+            "clear_radius_mm": "7.609435127229038",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "-47.97828798760293",
+            "aspheric_coefficients": [
+              "-0.00022489459966099467",
+              "0.0000020394734253627374",
+              "-0.000000051361406340612445",
+              "0.0000000007137911536082907"
+            ]
+          },
+          {
+            "surface_id": "S2",
+            "vertex_z_mm": "3.733965330992909",
+            "clear_radius_mm": "7.609435127229038",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "-9.20087256538321"
+          },
+          {
+            "surface_id": "S3",
+            "vertex_z_mm": "4.282359913218862",
+            "clear_radius_mm": "7.609435127229038",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED",
+            "radius_mm": "-18.31774439467407",
+            "aspheric_coefficients": [
+              "-0.00002109788901449107",
+              "-0.000005380389716930135",
+              "0.00000007343865050641794",
+              "-0.0000000007154321396950583"
+            ]
+          }
+        ],
+        "media": [
+          "N-LAK7",
+          "S-TIL26"
+        ],
+        "edge_radius_mm": "7.789435127229038",
+        "status": "SPECIFIED",
+        "valid_band_nm": {
+          "min_nm": "480.132",
+          "max_nm": "660.179",
+          "status": "DERIVED"
+        },
+        "approximations": [
+          "EDGE_AS_OPAQUE_RIM",
+          "GHOST_REFLECTIONS_NOT_TRACED",
+          "IDEAL_SURFACE_FIGURE",
+          "NOMINAL_PRESCRIPTION"
+        ]
+      }
+    },
+    {
+      "model_id": "L05",
+      "display_name": "L05",
+      "model": {
+        "model_kind": "SURFACE_SEQUENCE",
+        "model_version": "2",
+        "fidelity": "SURFACE_PRESCRIPTION",
+        "surfaces": [
+          {
+            "surface_id": "S1",
+            "vertex_z_mm": "0",
+            "clear_radius_mm": "23.3",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED"
+          },
+          {
+            "surface_id": "S2",
+            "vertex_z_mm": "1.5",
+            "clear_radius_mm": "23.3",
+            "traced": "TRANSMITTED",
+            "status": "SPECIFIED"
+          }
+        ],
+        "media": [
+          "N-BK7"
+        ],
+        "edge_radius_mm": "23.48",
+        "status": "SPECIFIED",
+        "valid_band_nm": {
+          "min_nm": "480.132",
+          "max_nm": "660.179",
+          "status": "DERIVED"
+        },
+        "approximations": [
+          "EDGE_AS_OPAQUE_RIM",
+          "GHOST_REFLECTIONS_NOT_TRACED",
+          "IDEAL_SURFACE_FIGURE",
+          "NOMINAL_PRESCRIPTION"
+        ]
+      }
+    },
+    {
+      "model_id": "Mount",
+      "display_name": "Mount",
+      "model": {
+        "model_kind": "APERTURE_STOP",
+        "model_version": "1",
+        "opening_radius_mm": "27.5",
+        "edge_radius_mm": "40",
+        "plane_z_mm": "0",
+        "status": "SPECIFIED"
+      }
+    }
+  ],
+  "model_materials": [
+    {
+      "material_id": "N-BK7",
+      "display_name": "N-BK7",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.03961212",
+          "0.231792344",
+          "1.01046945"
+        ],
+        "c_um2": [
+          "0.00600069867",
+          "0.0200179144",
+          "103.560653"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "N-F2",
+      "display_name": "N-F2",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.39757037",
+          "0.159201403",
+          "1.2686543"
+        ],
+        "c_um2": [
+          "0.00995906143",
+          "0.0546931752",
+          "119.248346"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "N-LAK14",
+      "display_name": "N-LAK14",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.50781212",
+          "0.318866829",
+          "1.14287213"
+        ],
+        "c_um2": [
+          "0.00746098727",
+          "0.0242024834",
+          "80.9565165"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "N-LAK7",
+      "display_name": "N-LAK7",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.23679889",
+          "0.445051837",
+          "1.01745888"
+        ],
+        "c_um2": [
+          "0.00610105538",
+          "0.0201388334",
+          "90.638038"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "S-TIH3",
+      "display_name": "S-TIH3",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.64797648",
+          "0.267261917",
+          "2.19772845"
+        ],
+        "c_um2": [
+          "0.0121917693",
+          "0.0597893039",
+          "192.15834"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "S-TIL26",
+      "display_name": "S-TIL26",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.31066488",
+          "0.0941903094",
+          "1.23292644"
+        ],
+        "c_um2": [
+          "0.00968897812",
+          "0.0527763106",
+          "133.296422"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    },
+    {
+      "material_id": "S-TIM28",
+      "display_name": "S-TIM28",
+      "dispersion": {
+        "kind": "SELLMEIER",
+        "b": [
+          "1.5427081",
+          "0.217113891",
+          "1.81904459"
+        ],
+        "c_um2": [
+          "0.0113925005",
+          "0.0579224572",
+          "167.697189"
+        ]
+      },
+      "valid_band_nm": {
+        "min_nm": "480.132",
+        "max_nm": "660.179",
+        "status": "SPECIFIED"
+      },
+      "basis": "Manufacturer dispersion coefficients used by the design study.",
+      "index_reference": {
+        "wavelength": "AIR",
+        "index": "RELATIVE_TO_AIR",
+        "reference_air": {
+          "model": "EDLEN_1953_OPTICSTUDIO",
+          "temperature_c": "20",
+          "pressure_pa": "101325"
+        },
+        "source_band_nm": [
+          "480",
+          "660"
+        ],
+        "stated_by": "SOURCE_TEXT",
+        "basis": "Catalog wavelengths in air and refractive index relative to standard air."
+      }
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "Sensor",
+      "pose": {
+        "position_mm": [
+          35.36499956265289,
+          0,
+          0
+        ],
+        "quaternion_wxyz": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "absorbing": true,
+      "medium": "air",
+      "aperture": {
+        "shape": "rectangle",
+        "half_width_mm": 18,
+        "half_height_mm": 12,
+        "center_offset_mm": [
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "targets": []
+}

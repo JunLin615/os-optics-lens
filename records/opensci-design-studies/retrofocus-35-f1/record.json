@@ -1,0 +1,106 @@
+{
+  "schema": "opensci.lens.record",
+  "record_schema_version": "1.0",
+  "record_id": "retrofocus-35-f1",
+  "record_revision": 1,
+  "title": "35 mm f/1 full-frame retrofocus lens",
+  "collection": {
+    "collection_id": "opensci-design-studies",
+    "source": "OpenSci reader-request optical design studies",
+    "source_input": "04_prime_35_f10/prescription.csv",
+    "source_input_sha256": "5aca2a2dff82910ec35d72f996365f8a5bf285795636954ad7a690a025c0a015",
+    "attribution": "35 mm f/1 full-frame retrofocus lens; numerical design study by OpenSci.",
+    "contributor": "JunLin615",
+    "redistribution": "Native design study contributed under the repository MIT License.",
+    "license": {
+      "spdx": "MIT",
+      "notice_path": "LICENSE",
+      "copyright": "Copyright (c) 2026 JunLin615"
+    },
+    "original_publication": {
+      "id": "US20250258361A1",
+      "reference": "Starting architecture, example 3; reoptimized design study.",
+      "url": "https://patents.google.com/patent/US20250258361A1/en"
+    }
+  },
+  "design": {
+    "design_scope": "COMPLETE_SYSTEM",
+    "lens_type": "camera_lens",
+    "design_family_id": "retrofocus-35-f1",
+    "function_tags": [
+      "imaging"
+    ],
+    "application_tags": [
+      "photography"
+    ],
+    "structure_tags": [
+      "refractive",
+      "fixed_focal_length"
+    ],
+    "configuration_count": 1,
+    "powered_element_count": 15,
+    "powered_group_count": 12,
+    "conjugate": "INFINITE_TO_FINITE"
+  },
+  "native_project": {
+    "path": "records/opensci-design-studies/retrofocus-35-f1/project.json",
+    "sha256": "f8aac8295255fba6a150247ef5260e8b8372631fda1c5cb3c9fbc77efda4150c",
+    "engine_version": "0.14.0",
+    "opening_outcome": "ACCEPTED",
+    "instance_id": "Objective",
+    "model_id": "Objective"
+  },
+  "image_format": {
+    "format_facets": [
+      "full_frame"
+    ],
+    "width_mm": 36,
+    "height_mm": 24,
+    "basis": "PROJECT_DECLARED rectangle at the image plane."
+  },
+  "first_order": {
+    "effective_focal_length_mm": {
+      "value": 35.00269046328824,
+      "basis": "ENGINE_COMPUTED",
+      "conditions": {
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Native paraxial effective focal length."
+    }
+  },
+  "aperture": {
+    "nominal_f_number": {
+      "value": 1,
+      "basis": "SOURCE_STATED",
+      "definition": "Nominal design iris setting at infinity.",
+      "system_aperture": true
+    },
+    "entrance_pupil_f_number": {
+      "value": 0.9583626888879878,
+      "basis": "PROJECT_DERIVED",
+      "conditions": {
+        "method": "axial_paraxial_clear_apertures",
+        "convention": "efl_over_admitted_entrance_pupil_diameter",
+        "conjugate": "infinite_to_finite",
+        "field": "on_axis",
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+      "system_aperture": true
+    }
+  },
+  "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline.",
+  "record_hash": "e878237badbf295c3890946fb0d70e49ee8c59ec560193f72a4753a8f7715cab",
+  "spectrum": {
+    "primary_wavelength_nm": 587.7218659920181,
+    "sampling_wavelengths_nm": [
+      486.2661779116133,
+      587.7218659920181,
+      656.4506882512153
+    ],
+    "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+    "band_facets": [
+      "visible"
+    ]
+  }
+}

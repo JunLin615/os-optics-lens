@@ -1,0 +1,106 @@
+{
+  "schema": "opensci.lens.record",
+  "record_schema_version": "1.0",
+  "record_id": "pancake-28-f28-open",
+  "record_revision": 1,
+  "title": "28 mm pancake lens at its maximum tested iris opening",
+  "collection": {
+    "collection_id": "opensci-design-studies",
+    "source": "OpenSci reader-request optical design studies",
+    "source_input": "06_pancake_chip_limit/prescription.csv",
+    "source_input_sha256": "4a944cbd478e1f644701734c8386895287b59dd5c9c93b31ae8f1ca5f28b6a62",
+    "attribution": "28 mm pancake lens at its maximum tested iris opening; numerical design study by OpenSci.",
+    "contributor": "JunLin615",
+    "redistribution": "Native design study contributed under the repository MIT License.",
+    "license": {
+      "spdx": "MIT",
+      "notice_path": "LICENSE",
+      "copyright": "Copyright (c) 2026 JunLin615"
+    },
+    "original_publication": {
+      "id": "US5760973",
+      "reference": "Starting architecture, example 1; reoptimized design study.",
+      "url": "https://patents.google.com/patent/US5760973/en"
+    }
+  },
+  "design": {
+    "design_scope": "COMPLETE_SYSTEM",
+    "lens_type": "camera_lens",
+    "design_family_id": "pancake-28-f28",
+    "function_tags": [
+      "imaging"
+    ],
+    "application_tags": [
+      "photography"
+    ],
+    "structure_tags": [
+      "refractive",
+      "fixed_focal_length"
+    ],
+    "configuration_count": 1,
+    "powered_element_count": 7,
+    "powered_group_count": 4,
+    "conjugate": "INFINITE_TO_FINITE"
+  },
+  "native_project": {
+    "path": "records/opensci-design-studies/pancake-28-f28-open/project.json",
+    "sha256": "c327c0cce3a1592b589e7afd3e0c5708f79fa22f53a312d6b5c069e05e18cb2a",
+    "engine_version": "0.14.0",
+    "opening_outcome": "ACCEPTED",
+    "instance_id": "Objective",
+    "model_id": "Objective"
+  },
+  "image_format": {
+    "format_facets": [
+      "full_frame"
+    ],
+    "width_mm": 36,
+    "height_mm": 24,
+    "basis": "PROJECT_DECLARED rectangle at the image plane."
+  },
+  "first_order": {
+    "effective_focal_length_mm": {
+      "value": 27.99775436780083,
+      "basis": "ENGINE_COMPUTED",
+      "conditions": {
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Native paraxial effective focal length."
+    }
+  },
+  "aperture": {
+    "nominal_f_number": {
+      "value": 2.65,
+      "basis": "SOURCE_STATED",
+      "definition": "Nominal design iris setting at infinity.",
+      "system_aperture": true
+    },
+    "entrance_pupil_f_number": {
+      "value": 2.471476354518084,
+      "basis": "PROJECT_DERIVED",
+      "conditions": {
+        "method": "axial_paraxial_clear_apertures",
+        "convention": "efl_over_admitted_entrance_pupil_diameter",
+        "conjugate": "infinite_to_finite",
+        "field": "on_axis",
+        "wavelength_nm": 587.7218659920181
+      },
+      "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter.",
+      "system_aperture": true
+    }
+  },
+  "record_hash_method": "SHA-256 over parsed JSON with record_hash and record_hash_method removed: json.dumps(body, sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline.",
+  "record_hash": "1f82a2f3cf97461fd9c2fb2f0f7ddf7a1c2ba48c10cd6605723ac64872aee2ab",
+  "spectrum": {
+    "primary_wavelength_nm": 587.7218659920181,
+    "sampling_wavelengths_nm": [
+      486.2661779116133,
+      587.7218659920181,
+      656.4506882512153
+    ],
+    "sampling_wavelengths_basis": "Native source wavelengths in vacuum.",
+    "band_facets": [
+      "visible"
+    ]
+  }
+}
