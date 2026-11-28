@@ -174,6 +174,26 @@ build/os-optics-lens-index.sqlite`, then pass `--index` to each command.
 search semantics, the error codes and how to rebuild the index.
 [Index schema](docs/INDEX_SCHEMA.md) documents the index tables and build findings.
 
+## The endoscopic imaging batch
+
+`records/endoscopic-imaging/` holds a second collection: endoscopic imaging objectives transcribed
+from published patent prescriptions, prepared for
+[issue #30](https://github.com/JunLin615/os-optics-lens/issues/30). Each record cites its
+publication, its example and a SHA-256 of the transcribed table text.
+
+| | |
+|---|---|
+| Candidates inventoried | 168 prescriptions from 25 publications |
+| Accepted records | 21, from 17 publications |
+| Deferred, with a reason | 8 |
+| Conversion failed | 0 |
+
+This source forces one decision the seed collection did not. A patent table states `nd` and `vd`, and
+two numbers do not define a dispersion curve, so **every glass is a constant index at the stated
+`nd`** and the records claim no colour correction. The stated `vd` is kept as a source fact and is
+not used. [Importing the endoscopic imaging batch](docs/ENDOSCOPIC_IMAGING_IMPORT.md) records the
+search, the conversion method, that material decision and the limits.
+
 ## Status and contributions
 
 The first package ships the search interface and the searchable collection together. The seed

@@ -1,0 +1,761 @@
+{
+ "schema": "opensci.project",
+ "project_schema_version": "2.0",
+ "components": [
+  {
+   "instance_id": "LENS",
+   "optical_role": "lens",
+   "custom_part": {
+    "custom_part_key": "LENS",
+    "description": "Endoscope objective US6353504B1 example 1 (wide end): imported from a csv-surface-table/1 prescription (8 elements, 0 aperture stops)"
+   },
+   "nominal_pose": {
+    "position_mm": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quaternion_wxyz": [
+     0.5,
+     0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "selected_parameters": [],
+   "retained_dofs": [],
+   "optical_model_id": "LENS"
+  },
+  {
+   "instance_id": "SRC",
+   "optical_role": "source",
+   "custom_part": {
+    "custom_part_key": "LENS-source",
+    "description": "Evaluation source derived from the source's stated wavelength and conjugate."
+   },
+   "nominal_pose": {
+    "position_mm": [
+     -10.4159,
+     0.0,
+     0.0
+    ],
+    "quaternion_wxyz": [
+     0.5,
+     0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "selected_parameters": [],
+   "retained_dofs": [],
+   "source_model": {
+    "model_kind": "GAUSSIAN_BEAM",
+    "wavelength_nm": 587.7218645194318,
+    "power_w": 0.001,
+    "waist_radius_mm": 0.05,
+    "waist_position_mm": 0.0,
+    "m2": 1.0,
+    "polarization": {
+     "kind": "LINEAR",
+     "angle_deg": 0.0
+    }
+   }
+  }
+ ],
+ "observations": [
+  {
+   "observation_id": "image_plane",
+   "pose": {
+    "position_mm": [
+     10.1023,
+     0.0,
+     0.0
+    ],
+    "quaternion_wxyz": [
+     0.5,
+     0.5,
+     0.5,
+     0.5
+    ]
+   },
+   "aperture": {
+    "shape": "circle",
+    "radius_mm": 0.72,
+    "center_offset_mm": [
+     0.0,
+     0.0
+    ],
+    "obstruction_radius_mm": 0.0
+   },
+   "absorbing": false,
+   "medium": "air"
+  }
+ ],
+ "targets": [],
+ "optical_models": [
+  {
+   "model_id": "LENS",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end) (csv-surface-table/1, source SHA-256 c419735f3e0dcad87563310ed830a691ed79f5b06d756a7c32ffc7b8c2d6bfcc)",
+   "model": {
+    "model_kind": "COMPOUND",
+    "model_version": "1",
+    "members": [
+     {
+      "member_id": "L1",
+      "model_id": "LENS-L1",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L2",
+      "model_id": "LENS-L2",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        0.9744
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L3",
+      "model_id": "LENS-L3",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        2.8401
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L4",
+      "model_id": "LENS-L4",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        3.7361
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L5",
+      "model_id": "LENS-L5",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        4.7204
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L6",
+      "model_id": "LENS-L6",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        5.3722
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L7",
+      "model_id": "LENS-L7",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        6.4004
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L8",
+      "model_id": "LENS-L8",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        8.0181
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    ],
+    "envelope": {
+     "kind": "CYLINDER",
+     "diameter_mm": "1.44",
+     "z_min_mm": "0",
+     "z_max_mm": "10.1013",
+     "status": "DERIVED"
+    },
+    "ports": [
+     {
+      "port_id": "IN",
+      "role": "INPUT",
+      "point_mm": [
+       "0",
+       "0",
+       "0"
+      ],
+      "direction": [
+       "0",
+       "0",
+       "1"
+      ],
+      "status": "DERIVED"
+     },
+     {
+      "port_id": "OUT",
+      "role": "OUTPUT",
+      "point_mm": [
+       "0",
+       "0",
+       "10.1013"
+      ],
+      "direction": [
+       "0",
+       "0",
+       "1"
+      ],
+      "status": "DERIVED"
+     }
+    ]
+   }
+  },
+  {
+   "model_id": "LENS-L1",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): element L1, surfaces 1-2 (rows 7-8, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.2352",
+      "radius_mm": "0.709",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G188300"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L2",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): cemented element L2, surfaces 3-5 (rows 9-11, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.2352",
+      "radius_mm": "1.3406",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S3",
+      "vertex_z_mm": "1.0282",
+      "radius_mm": "-1.3406",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G180100",
+     "G148750"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L3",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): element L3, surfaces 6-7 (rows 12-13, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "radius_mm": "1.9743",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.672",
+      "radius_mm": "-1.9743",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G148750"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L4",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): element L4, surfaces STO-10 (rows 14-15, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "clear_radius_mm": "0.297",
+      "edge_radius_mm": "0.297",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.2016",
+      "radius_mm": "1.2775",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G175500"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L5",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): element L5, surfaces 11-12 (rows 16-17, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "radius_mm": "1.5301",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.5846",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G162000"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L6",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): cemented element L6, surfaces 13-15 (rows 18-20, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "radius_mm": "3.196",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.7258",
+      "radius_mm": "-0.9583",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S3",
+      "vertex_z_mm": "0.961",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G148750",
+     "G178590"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L7",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): cemented element L7, surfaces 16-18 (rows 21-23, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "radius_mm": "1.557",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "0.7795",
+      "radius_mm": "-1.557",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S3",
+      "vertex_z_mm": "1.0147",
+      "radius_mm": "-7.0392",
+      "clear_radius_mm": "0.39",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G148750",
+     "G184670"
+    ],
+    "edge_radius_mm": "0.41",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "LENS-L8",
+   "display_name": "Endoscope objective US6353504B1 example 1 (wide end): element L8, surfaces 19-20 (rows 24-25, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "clear_radius_mm": "0.7",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "2.0832",
+      "clear_radius_mm": "0.7",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "G151630"
+    ],
+    "edge_radius_mm": "0.72",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "660",
+     "status": "DERIVED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  }
+ ],
+ "model_materials": [
+  {
+   "material_id": "G148750",
+   "display_name": "G148750",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.4875"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G151630",
+   "display_name": "G151630",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.5163"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G162000",
+   "display_name": "G162000",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.62"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G175500",
+   "display_name": "G175500",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.755"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G178590",
+   "display_name": "G178590",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.7859"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G180100",
+   "display_name": "G180100",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.801"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G184670",
+   "display_name": "G184670",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.8467"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  },
+  {
+   "material_id": "G188300",
+   "display_name": "G188300",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.883"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "660",
+    "status": "SPECIFIED"
+   },
+   "basis": "Defined in the imported prescription."
+  }
+ ]
+}

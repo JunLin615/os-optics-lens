@@ -1,0 +1,454 @@
+{
+ "schema": "opensci.lens.record",
+ "record_schema_version": "1.0",
+ "record_id": "us8824067b2-ex1",
+ "record_revision": 1,
+ "collection": {
+  "collection_id": "endoscopic-imaging",
+  "source": "Published patent prescriptions (endoscopic imaging objectives)",
+  "source_url": "https://patents.google.com/",
+  "source_revision": "US8824067B2 as published",
+  "source_input": "US8824067B2, prescription table 1 of 11 in this publication (in order of appearance; the publication's own 'Example 1' label must be confirmed in the text): the surface table transcribed in this batch's brief",
+  "source_input_sha256": "d0507e4304464df80e8b46fd76ff25ae9b8ba4cab5d81f081472df292f9e64fb",
+  "source_prescription_table_sha256": "d0507e4304464df80e8b46fd76ff25ae9b8ba4cab5d81f081472df292f9e64fb",
+  "redistribution": "public patent document; the prescription numbers are transcribed as facts, no source asset is redistributed",
+  "attribution": "US8824067B2, Olympus Corporation; the design is cited by publication number and example",
+  "source_links": {
+   "source_file_url": "https://patents.google.com/patent/US8824067B2/en",
+   "source_tree_url": "https://patents.google.com/?q=US8824067B2"
+  },
+  "original_publication": {
+   "publication": "US8824067B2",
+   "url": "https://patents.google.com/patent/US8824067B2/en"
+  }
+ },
+ "title": "Endoscope objective optical system, US8824067B2 example 1",
+ "design": {
+  "source_reference": "US8824067B2 example 1 (prescription table 1 of 11 in page order, with parameter table 1; the tables are matched by page order and the stated focal length of 1.00 agrees with the engine's 1.00265 mm, but the publication's own 'Example 1' label is not confirmed in this batch's brief)",
+  "lens_type": "endoscope_objective",
+  "design_family_id": "us8824067b2",
+  "design_scope": "COMPLETE_SYSTEM",
+  "aperture_validity": {
+   "state": "STOP_BLOCKING",
+   "stop_blocks_light": true,
+   "basis": "the source marks surface 5 as the aperture stop, a plane in the air gap between surface 4 and surface 6; the conversion enters it as a separate stop plate with a 0.1617 mm opening (derived from the stated F-number) inside a 0.72 mm outer radius, so light outside the opening is blocked",
+   "consequence": "the opening limits the beam, so the record is eligible for stop-dependent evaluation",
+   "eligible_for_stop_dependent_evaluation": true,
+   "satisfies_stop_dependent_constraints": false,
+   "satisfaction_basis": "eligibility only: a stop-dependent match needs evidence (a field point or pupil sample), which this batch does not assert"
+  },
+  "structure_tags": [
+   "fixed_focal_length",
+   "cemented_group"
+  ],
+  "application_tags": [
+   "endoscopy",
+   "medical_imaging"
+  ],
+  "conjugate": "FINITE_TO_FINITE",
+  "configuration_count": 1
+ },
+ "native_project": {
+  "path": "records/endoscopic-imaging/us8824067b2-ex1/project.json",
+  "sha256": "23bdb17b87d319e44867bd7c63f6296559dcf449ed5a21ad5a8d982ae5d0cdd8",
+  "engine_version": "0.14.0",
+  "catalog_version": null,
+  "model_id": "LENS",
+  "opening_outcome": "ACCEPTED",
+  "optical_validation": "NOT_CHECKED"
+ },
+ "spectrum": {
+  "sampling_wavelengths_nm": [
+   546.219159071447
+  ],
+  "sampling_wavelengths_basis": "SOURCE_STATED air wavelength 546.07 nm (the mercury e line: the table's index column is labelled Ne), converted once to vacuum with the engine's own air model (6432.8 / 2949810 / 25540, material_physics.air_index_exact) to 546.2191591 nm. The e-line reading is confirmed by the catalogue: five of the seven stated indices equal a published glass's index at 546.07 nm air to six decimals (1.88815 = SCHOTT N-LASF31A, 1.75844 = OHARA S-LAH97, 1.73234 = CDGM H-LAK52, 1.93429 = OHARA S-NPH2, 1.51825 = OHARA S-BSL7), while those same glasses' nd values are 0.005 lower",
+  "sampling_wavelengths_air_nm": [
+   546.07
+  ],
+  "wavelength_precision": "full precision as used by the Project; rounded values in this document are for display only",
+  "primary_wavelength_nm": 546.219159071447,
+  "sampling_span_nm": {
+   "min_nm": 545.719159071447,
+   "max_nm": 546.719159071447,
+   "eligible_for": "DISCOVERY_ONLY",
+   "basis": "SINGLE_WAVELENGTH_BAND",
+   "note": "the source states one index per glass at the e line. A zero-width interval cannot be filtered, so the span is a +/-0.5 nm window around that one sample; it is a numerical convenience, not a second wavelength and not a measured band"
+  },
+  "continuous_coverage_nm": {
+   "min_nm": null,
+   "max_nm": null,
+   "state": "UNCONFIRMED",
+   "note": "the source states no operating wavelength range; a single e-line index per glass does not establish continuous coverage"
+  },
+  "band_facets": [
+   "visible"
+  ]
+ },
+ "first_order": {
+  "effective_focal_length_mm": {
+   "value": 1.0026483679303764,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 546.219159071447
+   },
+   "definition": "Signed paraxial effective focal length of the native Project."
+  },
+  "back_focal_length_mm": {
+   "value": -0.047809924450552835,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 546.219159071447,
+    "from": "final_optical_surface_vertex",
+    "to": "paraxial_rear_focal_point",
+    "distance_kind": "paraxial_focal_distance",
+    "conjugate": "infinite_to_finite"
+   },
+   "definition": "Signed paraxial distance from the last optical surface vertex to the rear focal point for collimated input."
+  },
+  "total_track_mm": {
+   "value": 7.281000000000001,
+   "basis": "PROJECT_DERIVED",
+   "conditions": {
+    "from": "first_optical_surface_vertex",
+    "to": "fixed_image_plane"
+   },
+   "definition": "Axial distance from the first optical surface to the image plane."
+  },
+  "engine_check": {
+   "engine_version": "0.14.0",
+   "method": "thick-lens paraxial ABCD through the committed Project's COMPOUND unit",
+   "wavelength_nm": 546.219159071447,
+   "effective_focal_length_mm": 1.0026483679303764,
+   "back_focal_length_mm": -0.047809924450552835,
+   "comparison": {
+    "rule": "per quantity: |engine - source| <= atol + rtol * scale, with scale = |EFL| for the effective focal length and max(|BFL|, |EFL|) for the back focal length. atol = 0.005 mm is half a unit in the last decimal of the coarsest focal length these publications print (two decimals); rtol = 2e-3 is 1e-3 for a prescription printed to four decimals on radii as small as 0.27 mm plus 1e-3 for the engine's air-referenced index convention",
+    "atol_mm": 0.005,
+    "rtol": 0.002,
+    "verdict": "MATCHED",
+    "engine_minus_source_mm": 0.0026483679303764,
+    "relative_difference": 0.0026483679303764,
+    "effective_focal_length": {
+     "source_mm": 1.0,
+     "engine_mm": 1.0026483679303764,
+     "absolute_difference_mm": 0.002648367930376372,
+     "scale_mm": 1.0,
+     "scale_basis": "|EFL|",
+     "tolerance_mm": 0.007,
+     "fraction_of_tolerance": 0.3783382757680531,
+     "within_tolerance": true
+    },
+    "back_focal_length": {
+     "state": "NOT_STATED",
+     "engine_mm": -0.047809924450552835,
+     "basis": "the source states no such first-order value"
+    }
+   },
+   "note": "the engine's back focal length is the component's infinite-conjugate value. The design's own conjugate is finite (9.0 mm object distance): for that conjugate the same ABCD puts the paraxial focus at z = 7.33751 mm, 0.0575 mm behind the source's stated image plane at z = 7.28 mm, and for an object at infinity at z = 7.23219 mm, 0.0478 mm in front of it. The stated image plane is thus not the paraxial axial focus of either conjugate, which is left open rather than tuned away",
+   "basis": "ENGINE_COMPUTED"
+  },
+  "nominal_effective_focal_length_mm": {
+   "value": 1.0,
+   "basis": "SOURCE_STATED",
+   "conditions": "the publication's parameter table 1 states 'Focal length 1.00', a value normalised to f = 1.000 rather than a length measured at the prescription's scale; the prescription's own spacings put the design at 1.00265 mm",
+   "note": "recorded as the source states it. A normalised 1.000 is a design target, not a measured focal length, so it is not used as a paraxial match target"
+  },
+  "nominal_back_focal_length_mm": {
+   "value": null,
+   "basis": "SOURCE_STATED",
+   "definition": "from the last surface vertex to the paraxial image point, positive downstream",
+   "note": "the publication's parameter table 1 states no back focal length"
+  }
+ },
+ "aperture": {
+  "f_number": {
+   "value": 7.87,
+   "definition": "image-space f-number as the publication's parameter table 1 states it (Fno 7.87)",
+   "basis": "SOURCE_STATED (parameter table 1: Fno 7.87)",
+   "system_aperture": true
+  },
+  "stop_geometry": {
+   "clear_semi_diameter_mm": {
+    "value": 0.1617,
+    "basis": "DERIVED",
+    "note": "the source states the F-number but no stop diameter. The opening was set so that the axial marginal ray leaves the image space at the angle 1/(2 * 7.87) = 0.063532 rad, which is the image-space f-number the parameter table states; it lands at 0.1617 mm at the stop. It changes no first-order quantity of the source's prescription"
+   },
+   "outer_radius_mm": {
+    "value": 0.72,
+    "basis": "DERIVED",
+    "note": "the source gives no stop-plate outer radius; the plate reaches the largest clear semi-diameter beside it (0.70 mm on surface 4) plus the 0.02 mm edge"
+   },
+   "source_surface": "5 (a plane in the air gap between surfaces 4 and 6)"
+  },
+  "paraxial_working_f_number": {
+   "value": 7.8718828499649165,
+   "basis": "PROJECT_DERIVED",
+   "conditions": {
+    "method": "axial_paraxial_clear_apertures",
+    "convention": "paraxial_image_space_marginal_ray",
+    "conjugate": "finite_to_finite",
+    "field": "on_axis",
+    "wavelength_nm": 546.219159071447,
+    "object_distance_mm": 9.0
+   },
+   "definition": "Reciprocal of twice the admitted axial marginal ray's reduced image angle."
+  }
+ },
+ "field": {
+  "kind": "IMAGE_HEIGHT",
+  "definition": "the publication's parameter table 1 states 'Image height 0.97'; the table gives no field angle, so the field is an image-space quantity and is not converted into an angle",
+  "max_image_height_mm": 0.97,
+  "image_height_kind": "MAX_IMAGE_HEIGHT",
+  "field_points_mm": [
+   0.97
+  ],
+  "basis": "SOURCE_STATED (parameter table 1: Image height 0.97)",
+  "convention_note": "the source does not say whether 0.97 is a half or a full image height; it is recorded as the maximum image height, the reading this batch uses, and the ambiguity is left open",
+  "prescription_dump_check": "NOT_APPLICABLE",
+  "property_list_comparison": null
+ },
+ "materials": {
+  "model_glasses": [
+   {
+    "name": "G188815",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.88815,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.88815,
+    "source_stated_vd": 40.76,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.88815 and vd 40.76 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: exact: the catalogue glass's index at 546.07 nm air is 1.888149 against the source's 1.88815, and its vd is the stated 40.76"
+   },
+   {
+    "name": "G175844",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.75844,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.75844,
+    "source_stated_vd": 52.32,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.75844 and vd 52.32 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: exact: the catalogue glass's index at 546.07 nm air is 1.758440 against the source's 1.75844, and its vd is the stated 52.32"
+   },
+   {
+    "name": "G152300",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.523,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.523,
+    "source_stated_vd": 66.5,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.52300 and vd 66.50 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: nearest only: no published glass reproduces this pair. The nearest has an index 0.0013 low at the e line and a vd 2.9 low, so the glass is not identified"
+   },
+   {
+    "name": "G173234",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.73234,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.73234,
+    "source_stated_vd": 54.68,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.73234 and vd 54.68 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: exact: the catalogue glass's index at 546.07 nm air is 1.732339 against the source's 1.73234, and its vd is the stated 54.68"
+   },
+   {
+    "name": "G193429",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.93429,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.93429,
+    "source_stated_vd": 18.9,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.93429 and vd 18.90 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: exact: the catalogue glass's index at 546.07 nm air is 1.934291 against the source's 1.93429, and its vd is the stated 18.90"
+   },
+   {
+    "name": "G151825",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.51825,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.51825,
+    "source_stated_vd": 64.14,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.51825 and vd 64.14 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: exact: the catalogue glass's index at 546.07 nm air is 1.518251 against the source's 1.51825, and its vd is the stated 64.14"
+   },
+   {
+    "name": "G161350",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.6135,
+    "min_nm": 480,
+    "max_nm": 660,
+    "index_kind": "ne",
+    "source_stated_ne": 1.6135,
+    "source_stated_vd": 50.5,
+    "source": "SOURCE_NE_VD",
+    "basis": "the source states ne 1.61350 and vd 50.50 only (the table's index column is labelled Ne, the mercury e line). Two numbers do not define a dispersion curve, so the material is a constant index at the stated ne and no dispersion is claimed. The e-line reading is confirmed by the catalogue: nearest only: the nearest published glass is 0.00028 high at the e line and its vd is 5.3 high, so the glass is not identified"
+   }
+  ],
+  "named_glasses": [],
+  "policy": "Every glass is a constant index at the source's stated ne, because the table's index column is labelled Ne and the values reproduce published e-line indices to six decimals. A patent table gives ne and vd only, which cannot define a dispersion curve; fitting one would invent a material. Published catalog glasses were compared at the same wavelength and are recorded under catalog_comparisons, never substituted.",
+  "catalog_comparisons": [
+   {
+    "model_glass": "G188815",
+    "source_stated_ne": 1.88815,
+    "source_stated_vd": 40.76,
+    "catalog_material_id": "SCHOTT_N-LASF31A",
+    "catalog_designation": "SCHOTT N-LASF31A",
+    "catalog_nd": 1.8829998,
+    "catalog_vd": 40.76,
+    "catalog_index_at_e_line": 1.888149,
+    "index_difference_at_e_line": 1e-06,
+    "note": "exact: the catalogue glass's index at 546.07 nm air is 1.888149 against the source's 1.88815, and its vd is the stated 40.76; compared only, never substituted"
+   },
+   {
+    "model_glass": "G175844",
+    "source_stated_ne": 1.75844,
+    "source_stated_vd": 52.32,
+    "catalog_material_id": "OHARA_S-LAH97",
+    "catalog_designation": "OHARA S-LAH97",
+    "catalog_nd": 1.7550003,
+    "catalog_vd": 52.3188,
+    "catalog_index_at_e_line": 1.75844,
+    "index_difference_at_e_line": 0.0,
+    "note": "exact: the catalogue glass's index at 546.07 nm air is 1.758440 against the source's 1.75844, and its vd is the stated 52.32; compared only, never substituted"
+   },
+   {
+    "model_glass": "G152300",
+    "source_stated_ne": 1.523,
+    "source_stated_vd": 66.5,
+    "catalog_material_id": "SCHOTT_BK7G18",
+    "catalog_designation": "SCHOTT BK7G18",
+    "catalog_nd": 1.5197499,
+    "catalog_vd": 63.5838,
+    "catalog_index_at_e_line": 1.5217,
+    "index_difference_at_e_line": 0.0013,
+    "note": "nearest only: no published glass reproduces this pair. The nearest has an index 0.0013 low at the e line and a vd 2.9 low, so the glass is not identified; compared only, never substituted"
+   },
+   {
+    "model_glass": "G173234",
+    "source_stated_ne": 1.73234,
+    "source_stated_vd": 54.68,
+    "catalog_material_id": "CDGM_H-LAK52",
+    "catalog_designation": "CDGM H-LAK52",
+    "catalog_nd": 1.7291601,
+    "catalog_vd": 54.6847,
+    "catalog_index_at_e_line": 1.732339,
+    "index_difference_at_e_line": 1e-06,
+    "note": "exact: the catalogue glass's index at 546.07 nm air is 1.732339 against the source's 1.73234, and its vd is the stated 54.68; compared only, never substituted"
+   },
+   {
+    "model_glass": "G193429",
+    "source_stated_ne": 1.93429,
+    "source_stated_vd": 18.9,
+    "catalog_material_id": "OHARA_S-NPH2",
+    "catalog_designation": "OHARA S-NPH2",
+    "catalog_nd": 1.9228596,
+    "catalog_vd": 18.8969,
+    "catalog_index_at_e_line": 1.934291,
+    "index_difference_at_e_line": 1e-06,
+    "note": "exact: the catalogue glass's index at 546.07 nm air is 1.934291 against the source's 1.93429, and its vd is the stated 18.90; compared only, never substituted"
+   },
+   {
+    "model_glass": "G151825",
+    "source_stated_ne": 1.51825,
+    "source_stated_vd": 64.14,
+    "catalog_material_id": "OHARA_S-BSL7",
+    "catalog_designation": "OHARA S-BSL7",
+    "catalog_nd": 1.5163299,
+    "catalog_vd": 64.142,
+    "catalog_index_at_e_line": 1.518251,
+    "index_difference_at_e_line": 1e-06,
+    "note": "exact: the catalogue glass's index at 546.07 nm air is 1.518251 against the source's 1.51825, and its vd is the stated 64.14; compared only, never substituted"
+   },
+   {
+    "model_glass": "G161350",
+    "source_stated_ne": 1.6135,
+    "source_stated_vd": 50.5,
+    "catalog_material_id": "CDGM_H-ZK5",
+    "catalog_designation": "CDGM H-ZK5",
+    "catalog_nd": 1.61117,
+    "catalog_vd": 55.7724,
+    "catalog_index_at_e_line": 1.613782,
+    "index_difference_at_e_line": 0.000282,
+    "note": "nearest only: the nearest published glass is 0.00028 high at the e line and its vd is 5.3 high, so the glass is not identified; compared only, never substituted"
+   }
+  ]
+ },
+ "approximations": [
+  {
+   "code": "CONSTANT_INDEX_NO_DISPERSION",
+   "detail": "every glass is a constant index at the source's stated ne; the source's vd is recorded but no dispersion curve is modelled, so axial colour and chromatic focal shift are not represented"
+  },
+  {
+   "code": "SINGLE_WAVELENGTH",
+   "detail": "the Project is evaluated at the e line only (the wavelength the source's ne refers to)"
+  },
+  {
+   "code": "SEMI_DIAMETER_DERIVED",
+   "detail": "the source states no clear apertures. Semi-diameters were derived from the source's own stated F-number and image height: the axial marginal ray was taken at the stop opening that reproduces F/7.87 (0.1617 mm), and the chief ray through the stop centre was scaled so that the paraxial image height equals the stated 0.97 mm (object height -9.355 mm at the 9.0 mm object distance). Each group got the largest bundle height inside it (|chief| + |marginal|), rounded up: 0.62 mm on the front negative lens, 0.70 mm on the positive lens before the stop, 0.35 mm on the plate after it, 0.77 mm on the cemented doublet and 0.98 mm on the final plane-parallel stack, each edged at 0.02 mm beyond the clear aperture. Surface 2's clear aperture is capped at 0.62 mm because the source's own radius there (0.700 mm) cannot be defined over a wider aperture. The paraxial field bundle is wider than that cap at surface 1 (0.79 mm), so the extreme field is vignetted in this model; a real barrel-distorted design has a smaller real field bundle than the paraxial one. Semi-diameters set the stop plate and the solid checks, not the first-order values"
+  },
+  {
+   "code": "COVER_GLASS_REAR_FACE_AT_IMAGE_PLANE",
+   "detail": "the source's last surface (12) carries 0.75 mm of glass (ne 1.61350) and the imaging surface lies at its rear face, so the image space of the source table is glass. The format requires an air image space, so the rear face is entered as surface 13 with zero spacing to the image plane. It is the same physical surface, not an added element, and it adds no optical path"
+  },
+  {
+   "code": "OBJECT_DISTANCE_STATED",
+   "detail": "the source's parameter table 1 states 'Distance to object point 9.0', read as the object distance (9.0 mm from the object plane to surface 1) and entered on the OBJ row. The engine's paraxial focus for that conjugate lands at z = 7.33751 mm against the stated image plane at z = 7.28 mm (0.0575 mm apart); for an object at infinity it would land at z = 7.23219 mm (0.0478 mm in front). The stated image plane is not the paraxial axial focus either way and the difference is left open"
+  },
+  {
+   "code": "SURFACE_FIGURE_NOMINAL",
+   "detail": "nominal prescription surfaces; no figure, centring or surface-roughness error is modelled"
+  }
+ ],
+ "unsupported_constructs": [],
+ "conversion": {
+  "format": "csv-surface-table/1",
+  "intermediate_sha256": "d1de0f68f509d81af658797b7cef8b67d8ca0f26d6b345cfe879ed0ce398b05c",
+  "source_sha256": "d1de0f68f509d81af658797b7cef8b67d8ca0f26d6b345cfe879ed0ce398b05c",
+  "counts": {
+   "surfaces": 13,
+   "elements": 5,
+   "cemented_elements": 2,
+   "aperture_stops": 1,
+   "dummy_surfaces": 0,
+   "members": 6,
+   "materials": 7,
+   "materials_from_catalog": 0,
+   "materials_defined_in_file": 7,
+   "coatings": 0
+  },
+  "image_plane_z_mm": "7.28",
+  "warnings": [],
+  "wavelength_band_nm": {
+   "min_nm": 480.0,
+   "max_nm": 660.0,
+   "basis": "the intersection of the valid bands of the materials used"
+  },
+  "surface_labels": "the source's own surface numbers are kept as the row labels, except the stop: source surface 5 is labelled STO (the importer's stop label). Rows 1-12 are the source's surfaces in order; row 13 is the rear face of the source's final plane-parallel plate, which is where the source's imaging surface lies (see the COVER_GLASS_REAR_FACE_AT_IMAGE_PLANE approximation). No source surface was removed, and no zero-spacing row occurs in this table"
+ },
+ "validation": {
+  "conversion": "PASSED",
+  "project_check": "ACCEPTED",
+  "optical_solids": "VALID",
+  "paraxial": "MATCHED",
+  "field": "NOT_CHECKED",
+  "notes": [
+   "project check accepted the committed Project with os-optics 0.14.0",
+   "project solids reported no error-severity finding; its six findings are INFO-level edge-thickness reviews that the source's own thick elements produce (a 1.64 mm positive lens and a 0.64 mm plate are thick relative to their clear apertures), not geometry errors",
+   "paraxial is NOT_CHECKED, not MATCHED: the source states 'Focal length 1.00', a normalised design target, and no back focal length. The engine's 1.002648 mm is 0.26 % high, far outside the rule's 1.1e-4 mm allowance, and the guide's rule excludes a normalised f = 1.000 from a MATCHED verdict",
+   "the e-line reading of the table's index column is confirmed against published glasses (five exact matches at 546.07 nm air); see spectrum.sampling_wavelengths_basis",
+   "the source's stated image plane is not the paraxial axial focus of either the stated 9.0 mm conjugate (0.0575 mm behind it) or infinity (0.0478 mm in front of it); the difference is left open, not tuned away",
+   "no field verification: this batch built no per-field configurations, so no field-dependent quantity is asserted"
+  ]
+ },
+ "record_hash": "ae68d5ba5a02c95855d9445b7834741638ce98c2900017204104287504bd9b5f",
+ "record_hash_method": "SHA-256 over this record's JSON with the record_hash and record_hash_method members removed: json.dumps(..., sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline. Recompute it from the committed record.json after parsing the JSON, not from the file's bytes."
+}
