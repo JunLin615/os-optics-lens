@@ -1,0 +1,252 @@
+{
+ "schema": "opensci.lens.record",
+ "record_schema_version": "1.0",
+ "record_id": "mil-hdbk-141-t14-1-huygenian",
+ "record_revision": 1,
+ "title": "Huygenian eyepiece (MIL-HDBK-141 Table 14.1)",
+ "collection": {
+  "collection_id": "telescope-observation",
+  "source": "public-domain handbook",
+  "source_input": "MIL-HDBK-141, 14.3, Table 14.1 (Figure 14.1), p.14-2",
+  "source_input_sha256": "0d33fc6962b477b9b60032bd228a2ecb57f8502ca50e2f011b8dedc417662cff",
+  "attribution": "US Department of Defense, MIL-HDBK-141 Optical Design (1962), chapter 14. The handbook is a US Government work in the public domain; the digits were read from the modern transcription at github.com/jfblanchard/MIL-HDBK-141, which reproduces the printed tables.",
+  "contributor": "OpenSci prescription intake",
+  "original_publication": {
+   "id": "MIL-HDBK-141",
+   "reference": "14.3, Table 14.1 (Figure 14.1), p.14-2",
+   "assignee": "US Department of Defense",
+   "url": "https://github.com/jfblanchard/MIL-HDBK-141"
+  },
+  "redistribution": "MIL-HDBK-141 is a US Government work in the public domain. The transcription, the native Project and this evidence extract are MIT. The handbook itself is not redistributed.",
+  "license": {
+   "spdx": "MIT",
+   "notice_path": "LICENSE",
+   "copyright": "Copyright (c) 2026 JunLin615"
+  },
+  "evidence_extract": {
+   "path": "records/telescope-observation/mil-hdbk-141-t14-1-huygenian/evidence.json",
+   "sha256": "0d33fc6962b477b9b60032bd228a2ecb57f8502ca50e2f011b8dedc417662cff"
+  },
+  "series_issue_url": "https://github.com/JunLin615/os-optics-lens/issues/36"
+ },
+ "design": {
+  "lens_type": "eyepiece",
+  "design_type": "eyepiece",
+  "design_family_id": "mil-hdbk-141-huygenian",
+  "function_tags": [
+   "imaging",
+   "collimation"
+  ],
+  "application_tags": [
+   "astronomy",
+   "microscopy"
+  ],
+  "structure_tags": [
+   "refractive",
+   "fixed_focal_length"
+  ],
+  "powered_element_count": 2,
+  "conjugate": "INFINITE_TO_FINITE",
+  "design_scope": "COMPLETE_SYSTEM",
+  "configuration_count": 1,
+  "aperture_validity": {
+   "state": "STOP_BLOCKING",
+   "stop_blocks_light": true,
+   "basis": "The aperture-stop plate extends beyond its opening.",
+   "eligible_for_stop_dependent_evaluation": true,
+   "satisfies_stop_dependent_constraints": false,
+   "satisfaction_basis": "No pupil, illumination or MTF evidence is recorded, so no stop-dependent match is claimed.",
+   "consequence": "The record supports first-order and structural queries; a stop-dependent constraint stays unconfirmed."
+  },
+  "source_reference": null
+ },
+ "native_project": {
+  "path": "records/telescope-observation/mil-hdbk-141-t14-1-huygenian/project.json",
+  "sha256": "984968dfdd0d088f4ff1b46c7f5ca1a3de8a1597bdb7f13a8688dbda9c3c9371",
+  "engine_version": "0.14.0",
+  "catalog_version": null,
+  "instance_id": "OPTIC",
+  "model_id": "OPTIC",
+  "opening_outcome": "ACCEPTED",
+  "optical_validation": "PARAXIAL_MATCH"
+ },
+ "spectrum": {
+  "sampling_wavelengths_nm": [
+   587.721866
+  ],
+  "sampling_wavelengths_air_nm": [
+   587.5618
+  ],
+  "sampling_wavelengths_basis": "The publication prints one reference wavelength in air; it is converted once to the vacuum wavelength the engine evaluates.",
+  "incident_weights": [
+   1
+  ],
+  "primary_wavelength_nm": 587.721866,
+  "band_facets": [
+   "visible"
+  ],
+  "wavelength_precision": "A single sample; no rounding in the Project.",
+  "sampling_span_nm": {
+   "min_nm": 587.721866,
+   "max_nm": 587.721866,
+   "basis": "SINGLE_WAVELENGTH_BAND",
+   "eligible_for": "DISCOVERY_ONLY",
+   "note": "a zero-width interval cannot be filtered: the span is a +/-0.5 nm window around the one stated sample. The sample itself is sampling_wavelengths_nm; the window is a numerical convenience, not a second wavelength and not a measured band"
+  },
+  "continuous_coverage_nm": {
+   "state": "UNCONFIRMED",
+   "min_nm": null,
+   "max_nm": null,
+   "note": "The example states one reference wavelength only."
+  }
+ },
+ "first_order": {
+  "effective_focal_length_mm": {
+   "value": 25.398137709872127,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 587.721866
+   },
+   "definition": "Signed paraxial effective focal length of the native Project.",
+   "engine_value_mm": 25.398137709872127
+  },
+  "back_focal_length_mm": {
+   "value": -7.157841060987851,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 587.721866,
+    "from": "final_optical_surface_vertex",
+    "to": "paraxial_rear_focal_point",
+    "distance_kind": "paraxial_focal_distance",
+    "conjugate": "infinite_to_finite"
+   },
+   "definition": "Signed paraxial distance from the last optical surface vertex to the rear focal point for collimated input."
+  },
+  "engine_check": {
+   "engine_version": "0.14.0",
+   "basis": "ENGINE_COMPUTED",
+   "method": "Thick-lens ABCD through the committed Project at the reference wavelength.",
+   "effective_focal_length_mm": 25.398137709872127,
+   "back_focal_length_mm": -7.157841060987851,
+   "wavelength_nm": 587.721866,
+   "comparison": {
+    "rule": "|engine - source| <= atol + rtol * |source|. atol covers the printed precision of the stated focal length; rtol covers the printed precision of the radii and thicknesses, the constant-index material model and the engine's air-referenced index convention.",
+    "atol_mm": 0.005,
+    "rtol": 0.003,
+    "effective_focal_length": {
+     "source_mm": 25.4,
+     "engine_mm": 25.398137709872127,
+     "absolute_difference_mm": 0.0018622901278710913,
+     "scale_mm": 25.4,
+     "scale_basis": "|EFL|",
+     "tolerance_mm": 0.08120000000000001,
+     "within_tolerance": true,
+     "fraction_of_tolerance": 0.02293460748609718
+    },
+    "back_focal_length": {
+     "source_mm": -7.18,
+     "engine_mm": -7.157841060987851,
+     "absolute_difference_mm": 0.022158939012149048,
+     "scale_mm": 25.398137709872127,
+     "scale_basis": "max(|BFL|, |EFL|)",
+     "tolerance_mm": 0.0811944131296164,
+     "within_tolerance": true,
+     "fraction_of_tolerance": 0.27291211498474854,
+     "source_basis": "The table's last spacing is the printed distance from the final surface to the image plane, which is the back focal distance from that vertex; it is negative where the focus falls inside the last surface."
+    }
+   }
+  },
+  "nominal_effective_focal_length_mm": {
+   "value": 25.4,
+   "basis": "SOURCE_STATED",
+   "definition": "Effective focal length as printed for the example",
+   "conditions": "Reference wavelength (587.5618 nm in air); object at infinity.",
+   "engine_value_mm": 25.398137709872127
+  }
+ },
+ "aperture": {
+  "exit_pupil_diameter_mm": {
+   "value": 5.0,
+   "basis": "SOURCE_STATED",
+   "definition": "The eye-side pupil the source states for the eyepiece (its exit pupil). In this transcription direction the same plane is the model's entrance pupil.",
+   "system_aperture": true
+  },
+  "entrance_pupil_diameter_mm": {
+   "value": 5.0,
+   "basis": "DERIVED",
+   "definition": "Diameter of the modelled aperture that bounds the axial beam (the eye pupil plane in front of the eyepiece)",
+   "system_aperture": false
+  }
+ },
+ "field": {
+  "kind": "ANGULAR",
+  "definition": "Field angle; the full field is twice the stated half field",
+  "half_field_deg": 15.0,
+  "full_field_deg": 30.0,
+  "basis": "SOURCE_STATED",
+  "note": "In the modeled eye-to-field direction the internal focus is monitored by a nonabsorbing plane. A second plane records the beam after the final lens."
+ },
+ "materials": {
+  "basis": "Every element is a constant index equal to its printed nd, valid at the reference wavelength only; the printed vd values are kept in the evidence extract.",
+  "model_glasses": [
+   {
+    "name": "P01",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.517,
+    "min_nm": 480.0,
+    "max_nm": 680.0
+   }
+  ]
+ },
+ "approximations": [
+  {
+   "code": "CONSTANT_INDEX_FROM_ND",
+   "statement": "Each element is a constant index equal to its printed nd, valid only at the reference wavelength; the printed vd values are kept in the evidence extract but are not modelled."
+  },
+  {
+   "code": "CLEAR_APERTURES_DERIVED",
+   "statement": "The source states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the 5 mm exit pupil, chief ray at the stated half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed."
+  }
+ ],
+ "validation": {
+  "conversion": "PASSED",
+  "project_check": "ACCEPTED",
+  "optical_solids": "VALID",
+  "paraxial": "MATCHED",
+  "notes": [
+   "The handbook states f = 2.54 cm and a 5 mm exit pupil for every eyepiece in chapter 14.",
+   "The engine's paraxial EFL is compared with the stated 25.4 mm, and its back focal distance with the table's last spacing, which is the printed image distance from the final surface."
+  ],
+  "solids_findings": [
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element OPTIC member L1: the P01 between S1 and S2 is 2.5351 mm thick at its edge, 41% of its clear diameter 6.181 mm, above the review ratio 35%",
+    "member_id": "L1",
+    "surface_id": "S1",
+    "other_surface_id": "S2"
+   }
+  ]
+ },
+ "conversion": {
+  "format": "csv-surface-table/1",
+  "counts": {
+   "surfaces": 5,
+   "elements": 2,
+   "cemented_elements": 0,
+   "aperture_stops": 1,
+   "dummy_surfaces": 0,
+   "members": 3,
+   "materials": 1,
+   "materials_from_catalog": 0,
+   "materials_defined_in_file": 1,
+   "coatings": 0
+  },
+  "image_plane_z_mm": "26.34",
+  "warnings": [
+   "IMAGE_BEFORE_LAST_SURFACE"
+  ]
+ },
+ "record_hash": "8824b294c583f61424ad236a0335b4f6cf4088c4f65c3a5d2fc723bf46c40627",
+ "record_hash_method": "SHA-256 over this record's JSON with the record_hash and record_hash_method members removed: json.dumps(sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline"
+}

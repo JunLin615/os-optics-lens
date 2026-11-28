@@ -1,0 +1,285 @@
+{
+ "schema": "opensci.lens.record",
+ "record_schema_version": "1.0",
+ "record_id": "patent-us10527839b2-ex01",
+ "record_revision": 1,
+ "title": "Nikon 25.79 mm eyepiece optical system, 26.22 deg half field (numerical example 1)",
+ "collection": {
+  "collection_id": "telescope-observation",
+  "source": "US patent publication",
+  "source_input": "US10527839B2, TABLE 1, numerical example 1 (p. 9)",
+  "source_input_sha256": "1043595a3f30a2dd6c61d0ecf86fde1c990b5f35424e79ebdb8970163cb54990",
+  "attribution": "Nikon Corporation, US10527839B2. The prescription is the published numerical example; the native Project is a transcription of its table, reversed so the eyepiece forms a real image plane.",
+  "contributor": "OpenSci prescription intake",
+  "original_publication": {
+   "id": "US10527839B2",
+   "reference": "TABLE 1, numerical example 1 (p. 9)",
+   "assignee": "Nikon Corporation",
+   "url": "https://patents.google.com/patent/US10527839B2/en"
+  },
+  "redistribution": "The numerical prescription is published in a granted patent, a public record. The transcription, the native Project and this evidence extract are distributed under MIT. The patent document itself is not redistributed.",
+  "license": {
+   "spdx": "MIT",
+   "notice_path": "LICENSE",
+   "copyright": "Copyright (c) 2026 JunLin615"
+  },
+  "evidence_extract": {
+   "path": "records/telescope-observation/patent-us10527839b2-ex01/evidence.json",
+   "sha256": "1043595a3f30a2dd6c61d0ecf86fde1c990b5f35424e79ebdb8970163cb54990"
+  },
+  "series_issue_url": "https://github.com/JunLin615/os-optics-lens/issues/36"
+ },
+ "design": {
+  "lens_type": "eyepiece",
+  "design_type": "eyepiece",
+  "design_family_id": "nikon-us10527839b2",
+  "function_tags": [
+   "imaging",
+   "collimation"
+  ],
+  "application_tags": [
+   "photography",
+   "astronomy"
+  ],
+  "structure_tags": [
+   "refractive",
+   "fixed_focal_length",
+   "aspheric"
+  ],
+  "powered_element_count": 3,
+  "conjugate": "INFINITE_TO_FINITE",
+  "design_scope": "COMPLETE_SYSTEM",
+  "configuration_count": 1,
+  "aperture_validity": {
+   "state": "STOP_BLOCKING",
+   "stop_blocks_light": true,
+   "basis": "The aperture-stop plate extends beyond its opening.",
+   "eligible_for_stop_dependent_evaluation": true,
+   "satisfies_stop_dependent_constraints": false,
+   "satisfaction_basis": "No pupil, illumination or MTF evidence is recorded, so no stop-dependent match is claimed.",
+   "consequence": "The record supports first-order and structural queries; a stop-dependent constraint stays unconfirmed."
+  },
+  "source_reference": null
+ },
+ "native_project": {
+  "path": "records/telescope-observation/patent-us10527839b2-ex01/project.json",
+  "sha256": "3e372953cfc69f4b414282cdb5799264554573c9c7361b2279a0c899faf92f92",
+  "engine_version": "0.14.0",
+  "catalog_version": null,
+  "instance_id": "OPTIC",
+  "model_id": "OPTIC",
+  "opening_outcome": "ACCEPTED",
+  "optical_validation": "PARAXIAL_MATCH"
+ },
+ "spectrum": {
+  "sampling_wavelengths_nm": [
+   587.722066
+  ],
+  "sampling_wavelengths_air_nm": [
+   587.562
+  ],
+  "sampling_wavelengths_basis": "The publication prints one reference wavelength in air; it is converted once to the vacuum wavelength the engine evaluates.",
+  "incident_weights": [
+   1
+  ],
+  "primary_wavelength_nm": 587.722066,
+  "band_facets": [
+   "visible"
+  ],
+  "wavelength_precision": "A single sample; no rounding in the Project.",
+  "sampling_span_nm": {
+   "min_nm": 587.722066,
+   "max_nm": 587.722066,
+   "basis": "SINGLE_WAVELENGTH_BAND",
+   "eligible_for": "DISCOVERY_ONLY",
+   "note": "a zero-width interval cannot be filtered: the span is a +/-0.5 nm window around the one stated sample. The sample itself is sampling_wavelengths_nm; the window is a numerical convenience, not a second wavelength and not a measured band"
+  },
+  "continuous_coverage_nm": {
+   "state": "UNCONFIRMED",
+   "min_nm": null,
+   "max_nm": null,
+   "note": "The example states one reference wavelength only."
+  }
+ },
+ "first_order": {
+  "effective_focal_length_mm": {
+   "value": 25.81842245208171,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 587.722066
+   },
+   "definition": "Signed paraxial effective focal length of the native Project.",
+   "engine_value_mm": 25.81842245208171
+  },
+  "back_focal_length_mm": {
+   "value": 16.886287657501313,
+   "basis": "ENGINE_COMPUTED",
+   "conditions": {
+    "wavelength_nm": 587.722066,
+    "from": "final_optical_surface_vertex",
+    "to": "paraxial_rear_focal_point",
+    "distance_kind": "paraxial_focal_distance",
+    "conjugate": "infinite_to_finite"
+   },
+   "definition": "Signed paraxial distance from the last optical surface vertex to the rear focal point for collimated input."
+  },
+  "total_track_mm": {
+   "value": 53.18628765750131,
+   "basis": "PROJECT_DERIVED",
+   "conditions": {
+    "from": "first_optical_surface_vertex",
+    "to": "fixed_image_plane"
+   },
+   "definition": "Axial distance from the first optical surface to the image plane."
+  },
+  "engine_check": {
+   "engine_version": "0.14.0",
+   "basis": "ENGINE_COMPUTED",
+   "method": "Thick-lens ABCD through the committed Project at the reference wavelength.",
+   "effective_focal_length_mm": 25.81842245208171,
+   "back_focal_length_mm": 16.886287657501313,
+   "wavelength_nm": 587.722066,
+   "comparison": {
+    "rule": "|engine - source| <= atol + rtol * |source|. atol covers the printed precision of the stated focal length; rtol covers the printed precision of the radii and thicknesses, the constant-index material model and the engine's air-referenced index convention.",
+    "atol_mm": 0.005,
+    "rtol": 0.003,
+    "effective_focal_length": {
+     "source_mm": 25.79,
+     "engine_mm": 25.81842245208171,
+     "absolute_difference_mm": 0.028422452081709793,
+     "scale_mm": 25.79,
+     "scale_basis": "|EFL|",
+     "tolerance_mm": 0.08237,
+     "within_tolerance": true,
+     "fraction_of_tolerance": 0.34505829891598633
+    },
+    "back_focal_length": {
+     "state": "UNCONFIRMED",
+     "engine_mm": 16.886287657501313,
+     "basis": "The source prints no back focal length, so this quantity has no source value."
+    }
+   }
+  },
+  "nominal_effective_focal_length_mm": {
+   "value": 25.79,
+   "basis": "SOURCE_STATED",
+   "definition": "Effective focal length as printed for the example",
+   "conditions": "Reference wavelength (587.562 nm in air); object at infinity.",
+   "engine_value_mm": 25.81842245208171
+  }
+ },
+ "aperture": {
+  "entrance_pupil_diameter_mm": {
+   "value": 4.0,
+   "basis": "DERIVED",
+   "definition": "Diameter of the nominal 4 mm eye pupil plane placed 18 mm in front of the first surface. The publication states no pupil size, so this is the modelling choice the aperture basis describes, not a source value.",
+   "system_aperture": true
+  },
+  "entrance_pupil_f_number": {
+   "value": 6.454605613020431,
+   "basis": "PROJECT_DERIVED",
+   "conditions": {
+    "method": "axial_paraxial_clear_apertures",
+    "convention": "efl_over_admitted_entrance_pupil_diameter",
+    "conjugate": "infinite_to_finite",
+    "field": "on_axis",
+    "wavelength_nm": 587.722066
+   },
+   "definition": "Magnitude of effective focal length divided by the admitted axial entrance pupil diameter."
+  }
+ },
+ "field": {
+  "kind": "ANGULAR",
+  "definition": "Field angle; the full field is twice the stated half field",
+  "half_field_deg": 26.22,
+  "full_field_deg": 52.44,
+  "basis": "SOURCE_STATED",
+  "note": "The printed half angle of view is stated at a -1 m^-1 dioptre setting."
+ },
+ "materials": {
+  "basis": "Every element is a constant index equal to its printed nd, valid at the reference wavelength only; the printed vd values are kept in the evidence extract.",
+  "model_glasses": [
+   {
+    "name": "P01",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.49108,
+    "min_nm": 480.0,
+    "max_nm": 680.0
+   },
+   {
+    "name": "P02",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.52444,
+    "min_nm": 480.0,
+    "max_nm": 680.0
+   },
+   {
+    "name": "P03",
+    "kind": "CONSTANT_INDEX",
+    "index": 1.6355,
+    "min_nm": 480.0,
+    "max_nm": 680.0
+   }
+  ]
+ },
+ "approximations": [
+  {
+   "code": "CONSTANT_INDEX_FROM_ND",
+   "statement": "Each element is a constant index equal to its printed nd, valid only at the reference wavelength; the printed vd values are kept in the evidence extract but are not modelled."
+  },
+  {
+   "code": "CLEAR_APERTURES_DERIVED",
+   "statement": "The publication states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through a nominal 4 mm eye pupil, chief ray at the printed half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full printed field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed."
+  }
+ ],
+ "validation": {
+  "conversion": "PASSED",
+  "project_check": "ACCEPTED",
+  "optical_solids": "VALID",
+  "paraxial": "MATCHED",
+  "notes": [
+   "The engine's paraxial focal length is compared with the printed fa = 25.79 mm.",
+   "The printed conditional expressions are kept in the evidence extract, not re-evaluated.",
+   "The printed table ends with a plane in air, which the reversal keeps as the last surface before the image plane; it has no optical power and the importer carries it as a dummy surface (reported as DUMMY_SURFACE)."
+  ],
+  "solids_findings": [
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element OPTIC member L2: the P02 between S1 and S2 is 4.7235 mm thick at its edge, 42% of its clear diameter 11.2324 mm, above the review ratio 35%",
+    "member_id": "L2",
+    "surface_id": "S1",
+    "other_surface_id": "S2"
+   },
+   {
+    "code": "EDGE_THICKNESS_IMPLAUSIBLE",
+    "severity": "INFO",
+    "message": "element OPTIC member L3: the P03 between S1 and S2 is 6.5347 mm thick at its edge, 48% of its clear diameter 13.5808 mm, above the review ratio 35%",
+    "member_id": "L3",
+    "surface_id": "S1",
+    "other_surface_id": "S2"
+   }
+  ]
+ },
+ "conversion": {
+  "format": "csv-surface-table/1",
+  "counts": {
+   "surfaces": 8,
+   "elements": 3,
+   "cemented_elements": 0,
+   "aperture_stops": 1,
+   "dummy_surfaces": 1,
+   "members": 4,
+   "materials": 3,
+   "materials_from_catalog": 0,
+   "materials_defined_in_file": 3,
+   "coatings": 0
+  },
+  "image_plane_z_mm": "53.164729",
+  "warnings": [
+   "DUMMY_SURFACE"
+  ]
+ },
+ "record_hash": "5f921568a633b2a62a09b874cb30fb1f1b64649d26a44ff0ccb82775569f0bba",
+ "record_hash_method": "SHA-256 over this record's JSON with the record_hash and record_hash_method members removed: json.dumps(sort_keys=True, ensure_ascii=False) encoded as UTF-8, no trailing newline"
+}

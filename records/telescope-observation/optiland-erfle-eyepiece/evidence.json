@@ -1,0 +1,176 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "optiland-erfle-eyepiece",
+ "source": {
+  "publication": "optiland-samples",
+  "title": "optiland sample optical systems",
+  "assignee": "Kramer Harrison (optiland)",
+  "url": "https://github.com/optiland/optiland/blob/cd0a75693bd7258d1fa23db17b9a4d652423cbd9/optiland/samples/eyepieces.py",
+  "tables": "class EyepieceErfle",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "wavelength_air_nm": 587.6,
+   "half_field_deg": 20.0,
+   "f_mm": null,
+   "f_number": null,
+   "exit_pupil_diameter_mm": 4.0,
+   "wavelengths_air_nm": [
+    486.1,
+    587.6,
+    656.3
+   ],
+   "field_points_deg": [
+    0.0,
+    14.0,
+    20.0
+   ],
+   "wavelengths_basis": "The sample enables three wavelengths in air (0.4861, 0.5876 and 0.6563 um, d and F and C); each is converted once to the vacuum wavelength the engine evaluates. The committed Project traces the primary 587.6 nm sample; the other two are recorded because the sample enables them and the eyepiece is corrected over that band.",
+   "back_focus_mm": 32.685,
+   "back_focus_basis": "The sample's last surface spacing: its own paraxial solve places the image plane at the rear focus, so that spacing is the back focal distance from the final vertex."
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": null,
+    "thickness": 15.224,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": true,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": 2.0,
+    "thickness_stated_as": "15.224 mm"
+   },
+   {
+    "index": 2,
+    "radius": 269.0,
+    "thickness": 25.1,
+    "nd": 1.52249,
+    "vd": 59.5,
+    "glass": "L-BSL7",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "25.1 mm"
+   },
+   {
+    "index": 3,
+    "radius": -125.9,
+    "thickness": 36.5,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "36.5 mm"
+   },
+   {
+    "index": 4,
+    "radius": 93.6,
+    "thickness": 18.5,
+    "nd": 1.53996,
+    "vd": 59.7,
+    "glass": "N-BAK2",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "18.5 mm"
+   },
+   {
+    "index": 5,
+    "radius": -93.6,
+    "thickness": 4.1,
+    "nd": 1.62004,
+    "vd": 36.4,
+    "glass": "N-F2",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "4.1 mm"
+   },
+   {
+    "index": 6,
+    "radius": 2550.0,
+    "thickness": 0.19,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.19 mm"
+   },
+   {
+    "index": 7,
+    "radius": 93.6,
+    "thickness": 18.5,
+    "nd": 1.53996,
+    "vd": 59.7,
+    "glass": "N-BAK2",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "18.5 mm"
+   },
+   {
+    "index": 8,
+    "radius": -93.6,
+    "thickness": 4.1,
+    "nd": 1.62004,
+    "vd": 36.4,
+    "glass": "N-F2",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "4.1 mm"
+   },
+   {
+    "index": 9,
+    "radius": 2550.0,
+    "thickness": 32.685,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "32.685 mm"
+   }
+  ],
+  "derived_apertures_mm": [
+   2.04,
+   13.566073907405091,
+   13.566073907405091,
+   26.88002383243175,
+   26.88002383243175,
+   26.88002383243175,
+   27.446752732561418,
+   27.446752732561418,
+   27.446752732561418
+  ],
+  "aperture_basis": "The sample states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the stated entrance pupil, chief ray at the field points the sample enables), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "The sample places a plane stop 15.224 mm in front of the first lens and states an entrance pupil diameter of 4 mm; its field runs to 20 deg.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}

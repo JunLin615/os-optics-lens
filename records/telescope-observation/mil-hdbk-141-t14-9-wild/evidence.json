@@ -1,0 +1,182 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "mil-hdbk-141-t14-9-wild",
+ "source": {
+  "publication": "MIL-HDBK-141",
+  "title": "Military Handbook 141: Optical Design",
+  "assignee": "US Department of Defense",
+  "url": "https://github.com/jfblanchard/MIL-HDBK-141",
+  "tables": "Table 14.9",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "f_mm": 25.4,
+   "wavelength_air_nm": 587.5618,
+   "half_field_deg": 36.0,
+   "exit_pupil_diameter_mm": 5.0,
+   "eye_relief_mm": null,
+   "petzval_sum_per_cm": -0.1538,
+   "petzval_ratio_gamma": 2.56,
+   "magnification_basis": "designed for a ten-power telescope, focal length 2.54 cm and an exit pupil of 5 mm (MIL-HDBK-141 14.2.1)",
+   "back_focus_mm": 7.61,
+   "back_focus_basis": "The table's last spacing is the printed distance from the final surface to the image plane, which is the back focal distance from that vertex; it is negative where the focus falls inside the last surface."
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": -27.50275,
+    "thickness": 1.0,
+    "nd": 1.689,
+    "vd": 30.9,
+    "glass": "glass code 689309",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.1 cm"
+   },
+   {
+    "index": 2,
+    "radius": 250.0,
+    "thickness": 9.5,
+    "nd": 1.62,
+    "vd": 60.3,
+    "glass": "glass code 620603",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.95 cm"
+   },
+   {
+    "index": 3,
+    "radius": -25.0,
+    "thickness": 0.1,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.01 cm"
+   },
+   {
+    "index": 4,
+    "radius": -500.0,
+    "thickness": 8.0,
+    "nd": 1.62,
+    "vd": 60.3,
+    "glass": "glass code 620603",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.8 cm"
+   },
+   {
+    "index": 5,
+    "radius": -44.583148,
+    "thickness": 0.1,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.01 cm"
+   },
+   {
+    "index": 6,
+    "radius": 97.560976,
+    "thickness": 8.5,
+    "nd": 1.62,
+    "vd": 60.3,
+    "glass": "glass code 620603",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.85 cm"
+   },
+   {
+    "index": 7,
+    "radius": -97.560976,
+    "thickness": 0.1,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.01 cm"
+   },
+   {
+    "index": 8,
+    "radius": 46.061723,
+    "thickness": 3.5,
+    "nd": 1.649,
+    "vd": 33.8,
+    "glass": "glass code 649338",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.35 cm"
+   },
+   {
+    "index": 9,
+    "radius": 22.727273,
+    "thickness": 22.5,
+    "nd": 1.573,
+    "vd": 42.5,
+    "glass": "glass code 573425",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "2.25 cm"
+   },
+   {
+    "index": 10,
+    "radius": 46.082949,
+    "thickness": 7.61,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.761 cm"
+   }
+  ],
+  "derived_apertures_mm": [
+   7.75190742943059,
+   7.75190742943059,
+   7.75190742943059,
+   10.890953494041208,
+   10.890953494041208,
+   13.048778751705784,
+   13.048778751705784,
+   15.938238555155017,
+   15.938238555155017,
+   15.938238555155017
+  ],
+  "aperture_basis": "The source states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the 5 mm exit pupil, chief ray at the stated half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "Petzval curvature kept very small by strongly curved outer surfaces; the tangential field is under control out to 36 deg.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}

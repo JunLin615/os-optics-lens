@@ -1,0 +1,112 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "mil-hdbk-141-t14-3-kellner",
+ "source": {
+  "publication": "MIL-HDBK-141",
+  "title": "Military Handbook 141: Optical Design",
+  "assignee": "US Department of Defense",
+  "url": "https://github.com/jfblanchard/MIL-HDBK-141",
+  "tables": "Table 14.3",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "f_mm": 25.4,
+   "wavelength_air_nm": 587.5618,
+   "half_field_deg": 20.0,
+   "exit_pupil_diameter_mm": 5.0,
+   "eye_relief_mm": 7.0,
+   "petzval_sum_per_cm": -0.376,
+   "petzval_ratio_gamma": 1.047,
+   "magnification_basis": "designed for a ten-power telescope, focal length 2.54 cm and an exit pupil of 5 mm (MIL-HDBK-141 14.2.1)",
+   "back_focus_mm": 5.251,
+   "back_focus_basis": "The table's last spacing is the printed distance from the final surface to the image plane, which is the back focal distance from that vertex; it is negative where the focus falls inside the last surface."
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": 96.246391,
+    "thickness": 1.59,
+    "nd": 1.617,
+    "vd": 36.6,
+    "glass": "glass code 617366",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.159 cm"
+   },
+   {
+    "index": 2,
+    "radius": 13.526309,
+    "thickness": 9.95,
+    "nd": 1.541,
+    "vd": 59.9,
+    "glass": "glass code 541599",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.995 cm"
+   },
+   {
+    "index": 3,
+    "radius": -18.099548,
+    "thickness": 20.89,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "2.089 cm"
+   },
+   {
+    "index": 4,
+    "radius": 21.281124,
+    "thickness": 5.77,
+    "nd": 1.541,
+    "vd": 59.9,
+    "glass": "glass code 541599",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.577 cm"
+   },
+   {
+    "index": 5,
+    "radius": null,
+    "thickness": 5.251,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.5251 cm"
+   }
+  ],
+  "derived_apertures_mm": [
+   5.295699414945965,
+   5.295699414945965,
+   5.295699414945965,
+   9.743205029704951,
+   9.743205029704951
+  ],
+  "aperture_basis": "The source states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the 5 mm exit pupil, chief ray at the stated half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "Partially corrected for lateral colour; used out to a 20 deg half angle; the most common eyepiece in moderately wide-field telescopic systems; eye relief about 7 mm.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}

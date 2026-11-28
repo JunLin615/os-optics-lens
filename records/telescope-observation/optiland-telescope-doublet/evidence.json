@@ -1,0 +1,105 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "optiland-telescope-doublet",
+ "source": {
+  "publication": "optiland-samples",
+  "title": "optiland sample optical systems",
+  "assignee": "Kramer Harrison (optiland)",
+  "url": "https://github.com/optiland/optiland/blob/cd0a75693bd7258d1fa23db17b9a4d652423cbd9/optiland/samples/simple.py",
+  "tables": "class TelescopeDoublet",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "wavelength_air_nm": 587.6,
+   "half_field_deg": 1.0,
+   "f_mm": null,
+   "f_number": 8.0,
+   "wavelengths_air_nm": [
+    486.1,
+    587.6,
+    656.3
+   ],
+   "field_points_deg": [
+    0.0,
+    0.7,
+    1.0
+   ],
+   "wavelengths_basis": "The sample enables three wavelengths in air (0.4861, 0.5876 and 0.6563 um, d and F and C); each is converted once to the vacuum wavelength the engine evaluates. The committed Project traces the primary 587.6 nm sample; the other two are recorded because the sample enables them and the doublet is corrected over that band.",
+   "back_focus_mm": 47.3562,
+   "back_focus_basis": "The sample's last surface spacing: its own paraxial solve places the image plane at the rear focus, so that spacing is the back focal distance from the final vertex."
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": 29.32908,
+    "thickness": 0.7,
+    "nd": 1.5168,
+    "vd": 64.17,
+    "glass": "N-BK7",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.7 mm"
+   },
+   {
+    "index": 2,
+    "radius": -20.06842,
+    "thickness": 0.032,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.032 mm"
+   },
+   {
+    "index": 3,
+    "radius": -20.0877,
+    "thickness": 0.578,
+    "nd": 1.64769,
+    "vd": 33.8,
+    "glass": "SF2",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.578 mm"
+   },
+   {
+    "index": 4,
+    "radius": -66.54774,
+    "thickness": 47.3562,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "47.3562 mm"
+   }
+  ],
+  "derived_apertures_mm": [
+   3.060689575294972,
+   3.060689575294972,
+   3.040352305009307,
+   3.040352305009307
+  ],
+  "aperture_basis": "The sample states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the stated entrance pupil, chief ray at the field points the sample enables), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "The sample states an image-space f-number of 8 and no focal length; the fields run to 1 deg. The record carries the engine's focal length and marks the paraxial comparison as not checkable.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}

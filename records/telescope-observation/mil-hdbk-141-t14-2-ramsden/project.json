@@ -1,0 +1,309 @@
+{
+ "schema": "opensci.project",
+ "project_schema_version": "2.0",
+ "components": [
+  {
+   "instance_id": "OPTIC",
+   "optical_role": "lens",
+   "custom_part": {
+    "custom_part_key": "OPTIC",
+    "description": "mil-hdbk-141-t14-2-ramsden"
+   },
+   "nominal_pose": {
+    "position_mm": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "quaternion_wxyz": [
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "selected_parameters": [],
+   "retained_dofs": [],
+   "optical_model_id": "OPTIC"
+  },
+  {
+   "instance_id": "SRC",
+   "optical_role": "source",
+   "custom_part": {
+    "custom_part_key": "source-collimated",
+    "description": "On-axis collimated source."
+   },
+   "nominal_pose": {
+    "position_mm": [
+     0.0,
+     0.0,
+     -200.0
+    ],
+    "quaternion_wxyz": [
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "selected_parameters": [],
+   "retained_dofs": [],
+   "source_model": {
+    "model_kind": "GAUSSIAN_BEAM",
+    "wavelength_nm": 587.721866,
+    "power_w": 0.001,
+    "waist_radius_mm": 2.5,
+    "waist_position_mm": -200.0,
+    "m2": 1.0,
+    "polarization": {
+     "kind": "LINEAR",
+     "angle_deg": 0.0
+    }
+   }
+  }
+ ],
+ "observations": [
+  {
+   "observation_id": "image_plane",
+   "pose": {
+    "position_mm": [
+     0.0,
+     0.0,
+     47.117762439205556
+    ],
+    "quaternion_wxyz": [
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "aperture": {
+    "shape": "circle",
+    "radius_mm": 10.0,
+    "center_offset_mm": [
+     0.0,
+     0.0
+    ],
+    "obstruction_radius_mm": 0.0
+   },
+   "absorbing": true,
+   "medium": "air"
+  }
+ ],
+ "targets": [],
+ "optical_models": [
+  {
+   "model_id": "OPTIC",
+   "display_name": "mil-hdbk-141-t14-2-ramsden (csv-surface-table/1, source SHA-256 1ec38e8d58c0f0867960d27c2d3536ea42af0a61079a94631c9b531a4e32f052)",
+   "model": {
+    "model_kind": "COMPOUND",
+    "model_version": "1",
+    "members": [
+     {
+      "member_id": "STOP",
+      "model_id": "OPTIC-STOP",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L1",
+      "model_id": "OPTIC-L1",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        12.0
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     },
+     {
+      "member_id": "L2",
+      "model_id": "OPTIC-L2",
+      "pose": {
+       "position_mm": [
+        0.0,
+        0.0,
+        36.13
+       ],
+       "quaternion_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    ],
+    "envelope": {
+     "kind": "CYLINDER",
+     "diameter_mm": "13.881132107556036",
+     "z_min_mm": "0",
+     "z_max_mm": "40.37",
+     "status": "DERIVED"
+    },
+    "ports": [
+     {
+      "port_id": "IN",
+      "role": "INPUT",
+      "point_mm": [
+       "0",
+       "0",
+       "0"
+      ],
+      "direction": [
+       "0",
+       "0",
+       "1"
+      ],
+      "status": "DERIVED"
+     },
+     {
+      "port_id": "OUT",
+      "role": "OUTPUT",
+      "point_mm": [
+       "0",
+       "0",
+       "40.37"
+      ],
+      "direction": [
+       "0",
+       "0",
+       "1"
+      ],
+      "status": "DERIVED"
+     }
+    ]
+   }
+  },
+  {
+   "model_id": "OPTIC-STOP",
+   "display_name": "mil-hdbk-141-t14-2-ramsden: aperture stop STOP, surface STO (row 10, csv-surface-table/1)",
+   "model": {
+    "model_kind": "APERTURE_STOP",
+    "model_version": "1",
+    "opening_radius_mm": "2.5",
+    "edge_radius_mm": "6.940566053778018",
+    "plane_z_mm": "0",
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "OPTIC-L1",
+   "display_name": "mil-hdbk-141-t14-2-ramsden: element L1, surfaces 1-2 (rows 11-12, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "clear_radius_mm": "3.085085882367069",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "2.97",
+      "radius_mm": "-17.507003",
+      "clear_radius_mm": "3.085085882367069",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "P01"
+    ],
+    "edge_radius_mm": "3.085085882367069",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "680",
+     "status": "SPECIFIED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  },
+  {
+   "model_id": "OPTIC-L2",
+   "display_name": "mil-hdbk-141-t14-2-ramsden: element L2, surfaces 3-4 (rows 13-14, csv-surface-table/1)",
+   "model": {
+    "model_kind": "SURFACE_SEQUENCE",
+    "model_version": "2",
+    "fidelity": "SURFACE_PRESCRIPTION",
+    "surfaces": [
+     {
+      "surface_id": "S1",
+      "vertex_z_mm": "0",
+      "radius_mm": "19.696671",
+      "clear_radius_mm": "6.940566053778018",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     },
+     {
+      "surface_id": "S2",
+      "vertex_z_mm": "4.24",
+      "clear_radius_mm": "6.940566053778018",
+      "traced": "TRANSMITTED",
+      "status": "SPECIFIED"
+     }
+    ],
+    "media": [
+     "P01"
+    ],
+    "edge_radius_mm": "6.940566053778018",
+    "valid_band_nm": {
+     "min_nm": "480",
+     "max_nm": "680",
+     "status": "SPECIFIED"
+    },
+    "approximations": [
+     "EDGE_AS_OPAQUE_RIM",
+     "GHOST_REFLECTIONS_NOT_TRACED",
+     "IDEAL_SURFACE_FIGURE",
+     "NOMINAL_PRESCRIPTION"
+    ],
+    "status": "SPECIFIED"
+   }
+  }
+ ],
+ "model_materials": [
+  {
+   "material_id": "P01",
+   "display_name": "nd 1.51700, vd 64.50",
+   "dispersion": {
+    "kind": "CONSTANT_INDEX",
+    "refractive_index": "1.517"
+   },
+   "valid_band_nm": {
+    "min_nm": "480",
+    "max_nm": "680",
+    "status": "SPECIFIED"
+   },
+   "basis": "constant index at the reference wavelength from the publication's nd"
+  }
+ ]
+}

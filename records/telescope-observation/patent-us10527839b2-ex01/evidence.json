@@ -1,0 +1,144 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "patent-us10527839b2-ex01",
+ "source": {
+  "publication": "US10527839B2",
+  "title": "Eyepiece optical system, optical apparatus and method for manufacturing the eyepiece optical system",
+  "assignee": "Nikon Corporation",
+  "url": "https://patents.google.com/patent/US10527839B2/en",
+  "tables": "TABLE 1",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "f_mm": 25.79,
+   "wavelength_air_nm": 587.562,
+   "half_field_deg": 26.22,
+   "focal_length_final_lens_mm": -103.68,
+   "total_length_stated_mm": 34.5,
+   "conditionals": "(1) |fe/fa| = 4.02, (2) Re2/fa = 0.70, (3A) sum d/fa = 0.71, (3B) sum d0/fa = 0.71, (4) fa = 25.79 mm"
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": -18.02378,
+    "thickness": 1.5,
+    "nd": 1.49108,
+    "vd": 57.08,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "1.5 mm"
+   },
+   {
+    "index": 2,
+    "radius": -28.66506,
+    "thickness": 3.0,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "3 mm"
+   },
+   {
+    "index": 3,
+    "radius": 11.30158,
+    "thickness": 7.0,
+    "nd": 1.52444,
+    "vd": 56.21,
+    "glass": null,
+    "is_stop": false,
+    "conic": -0.01352,
+    "asphere": {
+     "a4": -3.3928e-05,
+     "a6": -1.4109e-07,
+     "a8": 4.0422e-09
+    },
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "7 mm"
+   },
+   {
+    "index": 4,
+    "radius": -19.68874,
+    "thickness": 0.8,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.8 mm"
+   },
+   {
+    "index": 5,
+    "radius": -32.92255,
+    "thickness": 6.0,
+    "nd": 1.6355,
+    "vd": 23.89,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "6 mm"
+   },
+   {
+    "index": 6,
+    "radius": 51.98159,
+    "thickness": 16.2,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": 4.89886,
+    "asphere": {
+     "a4": -0.00020046,
+     "a6": -1.9561e-06,
+     "a8": -2.3308e-09
+    },
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "16.2 mm"
+   },
+   {
+    "index": 7,
+    "radius": null,
+    "thickness": 0.664729,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.664729 mm"
+   }
+  ],
+  "derived_apertures_mm": [
+   2.6012645090642317,
+   2.6012645090642317,
+   5.616195665707778,
+   5.616195665707778,
+   6.790396991283105,
+   6.790396991283105,
+   12.714175236111116
+  ],
+  "aperture_basis": "The publication states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through a nominal 4 mm eye pupil, chief ray at the printed half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full printed field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "Reversed transcription: the printed table runs from the display panel to the eye point and the eyepiece images the panel to a virtual image, so the record reverses it (radii negated, thicknesses reversed) and places a real image plane at the paraxial rear focus. The paraxial focal length is unchanged by the reversal. The asphere is even in the aperture coordinate, so its conic and A4..A8 coefficients survive the reversal unchanged.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}

@@ -1,0 +1,98 @@
+{
+ "schema": "opensci.lens.evidence_extract",
+ "record_id": "mil-hdbk-141-t14-1-huygenian",
+ "source": {
+  "publication": "MIL-HDBK-141",
+  "title": "Military Handbook 141: Optical Design",
+  "assignee": "US Department of Defense",
+  "url": "https://github.com/jfblanchard/MIL-HDBK-141",
+  "tables": "Table 14.1",
+  "retrieved": "2026-11-27"
+ },
+ "sections": {
+  "stated_parameters": {
+   "f_mm": 25.4,
+   "wavelength_air_nm": 587.5618,
+   "half_field_deg": 15.0,
+   "exit_pupil_diameter_mm": 5.0,
+   "eye_relief_mm": 2.92,
+   "petzval_sum_per_cm": -0.5538,
+   "petzval_ratio_gamma": 0.711,
+   "magnification_basis": "designed for a ten-power telescope, focal length 2.54 cm and an exit pupil of 5 mm (MIL-HDBK-141 14.2.1)",
+   "back_focus_mm": -7.18,
+   "back_focus_basis": "The table's last spacing is the printed distance from the final surface to the image plane, which is the back focal distance from that vertex; it is negative where the focus falls inside the last surface."
+  },
+  "surfaces": [
+   {
+    "index": 1,
+    "radius": null,
+    "thickness": 3.0,
+    "nd": 1.517,
+    "vd": 64.5,
+    "glass": "glass code 517645",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.3 cm"
+   },
+   {
+    "index": 2,
+    "radius": -10.505305,
+    "thickness": 23.1,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "2.31 cm"
+   },
+   {
+    "index": 3,
+    "radius": null,
+    "thickness": 4.5,
+    "nd": 1.517,
+    "vd": 64.5,
+    "glass": "glass code 517645",
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "0.45 cm"
+   },
+   {
+    "index": 4,
+    "radius": -14.854427,
+    "thickness": -7.18,
+    "nd": null,
+    "vd": null,
+    "glass": null,
+    "is_stop": false,
+    "conic": null,
+    "asphere": null,
+    "semi_diameter_mm": null,
+    "thickness_stated_as": "-0.718 cm"
+   }
+  ],
+  "derived_apertures_mm": [
+   3.090490790269766,
+   3.090490790269766,
+   7.692466017002947,
+   7.692466017002947
+  ],
+  "aperture_basis": "The source states no clear semi-diameters. Each element is given one clear diameter: the largest of the paraxial marginal-ray and chief-ray envelopes over its own surfaces (marginal ray through the 5 mm exit pupil, chief ray at the stated half field), times a 2 per cent mechanical margin. The envelope is a minimum clear aperture, so every surface of the element passes the axial beam and the chief ray at the full stated field. It is a buildable estimate, not a drawing: no vignetting beyond the stop is modelled and no vignetting figure is claimed.",
+  "transcription_notes": "Apparent field about +-15 deg; used in microscopes and small-field telescopes; well corrected for lateral colour; eye relief about 3 mm. The field stop lies between the two lenses, so the focus falls 0.718 cm inside the last surface: this record carries a virtual image plane and says so.",
+  "build_attempts": [
+   {
+    "margin": 1.02,
+    "outcome": "IMPORTED",
+    "solids": "VALID",
+    "solids_errors": 0,
+    "check": "ACCEPTED"
+   }
+  ]
+ },
+ "evidence_version": "1.0"
+}
